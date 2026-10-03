@@ -721,16 +721,30 @@ function effChan() {
   if (/api\.day\.app/i.test(v)) return 'bark';
   return whCfg.chan === 'bark' ? 'bark' : 'wecom';
 }
-/* 解析 Bark 目标。兼容四类输入：
+/* 从任意文本里抓设备 Key：容忍把整条 curl 命令、完整推送链接、点连接整段粘进来 */
+function extractBarkKey(text) {
+  const m = /api\.day\.app\.?[/]?([A-Za-z0-9_-]{8,})/i.exec(text);
+  if (m) return m[1];
+  const k = /[A-Za-z0-9_-]{16,}/.exec(text);           // 兜底：取第一个 16 位以上的 token
+  return k ? k[0] : '';
+}
+/* 解析 Bark 目标。兼容五类输入：
    ① 仅设备 Key            aGPNNEAk...
-   ② 国区版点连接          https://api.day.app.aGPNNEAk...
-   ③ 完整 GET 推送链接     https://api.day.app/<key>/<title>/<body>?...
-   ④ 自建服务器            https://bark.example.com/<key>...
+   ② 整条 curl 命令        curl -X POST https://api.day.app/<key> -d ...
+   ③ 国区版点连接          https://api.day.app.aGPNNEAk...
+   ④ 完整 GET 推送链接     https://api.day.app/<key>/<title>/<body>?...
+   ⑤ 自建服务器            https://bark.example.com/<key>...
    返回 {host, deviceKey}，发送时 POST https://<host>/push（正文走 body，不受 URL 长度限制） */
 function barkTarget() {
   const v = (whCfg.url || '').trim();
   if (!v) return null;
-  if (!/^https?:\/\//i.test(v)) return { host: 'api.day.app', deviceKey: v };
+  // ① 纯设备 Key：无空格、无斜杠、无域名
+  if (!/^https?:\/\//i.test(v) && !/[\s/]/.test(v)) return { host: 'api.day.app', deviceKey: v };
+  // ② 粘进来的是整条 curl 命令或其它杂串：从里面把 Key 抓出来
+  if (!/^https?:\/\//i.test(v)) {
+    const k = extractBarkKey(v);
+    return k ? { host: 'api.day.app', deviceKey: k } : null;
+  }
   const rest = v.replace(/^https?:\/\//i, '');
   const qIdx = rest.indexOf('?');
   const path = qIdx >= 0 ? rest.slice(0, qIdx) : rest;
@@ -879,7 +893,7 @@ function renderDaily() {
     <input class="issue-input" placeholder="今天要上报的课题 / 协调事项，留空 = 暂无…" value="${esc(issue)}">
   </div>
   <div class="day-foot">
-    <span class="cur-hint">日报推送<sup style="opacity:.45;font-size:10px" title="代码版本，用于确认浏览器已加载最新文件">v8</sup></span>
+    <span class="cur-hint">日报推送<sup style="opacity:.45;font-size:10px" title="代码版本，用于确认浏览器已加载最新文件">v9</sup></span>
     <select class="wh-chan" title="推送通道（粘贴 Bark 地址会自动切到 Bark）">
       <option value="wecom"${effChan() === 'wecom' ? ' selected' : ''}>企微机器人</option>
       <option value="bark"${effChan() === 'bark' ? ' selected' : ''}>Bark 手机推送</option>
@@ -961,6 +975,11 @@ async function sendWecom(url, content) {
   if (effChan() === 'bark') {
     const t = barkTarget();
     if (!t || !t.deviceKey) return { ok: false, msg: '没能从地址里识别出 Bark 设备 Key', via: '解析失败' };
+    // Key 形态校验：Bark 对无效 Key 返回 400 且不带跨域头，浏览器只会报 Failed to fetch，
+    // 若放任它走降级盲发，会变成"界面显示已发送、手机永远收不到"，故此处直接拦住并说清。
+    if (!/^[A-Za-z0-9_-]{16,}$/.test(t.deviceKey)) {
+      return { ok: false, msg: `识别到的 Key 不合法（当前取到「${t.deviceKey.slice(0, 24)}…」），请只填设备 Key 或完整推送地址`, via: '解析失败' };
+    }
     const endpoint = 'https://' + t.host + '/push';
     const fields = { device_key: t.deviceKey, title: title, body: body, group: '待办日报' };
     const form = new URLSearchParams(fields).toString();
