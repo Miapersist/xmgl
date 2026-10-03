@@ -1,0 +1,7 @@
+# macOS
+.DS_Store
+.AppleDouble
+Thumbs.db
+
+# Office 临时文件
+~$*

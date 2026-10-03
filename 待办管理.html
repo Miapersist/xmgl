@@ -1,0 +1,1860 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>待办管理 · 彭俊铭</title>
+<style>
+  :root{
+    --bg:#f5f6f8; --card:#ffffff; --line:#e4e7ec; --line2:#eef0f3;
+    --text:#1f2430; --text2:#5b6472; --text3:#98a1ae;
+    --primary:#3457d5; --primary-soft:#eef2ff;
+    --p0:#e5484d; --p1:#f5a524; --p2:#3e63dd; --p-none:#8b95a3;
+    --done:#12a594; --doing:#3457d5; --block:#e5484d;
+    --radius:12px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font:14px/1.6 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Segoe UI",sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1080px; margin:0 auto; padding:28px 20px 120px;}
+
+  /* ---------- 头部 ---------- */
+  header{display:flex; align-items:flex-end; gap:16px; flex-wrap:wrap; margin-bottom:6px;}
+  h1{font-size:24px; margin:0; letter-spacing:.5px;}
+  .sub{color:var(--text3); font-size:12.5px;}
+  .spacer{flex:1;}
+  .updated{font-size:12.5px; color:var(--text3);}
+  .updated input{
+    border:1px solid transparent; background:transparent; color:var(--text2);
+    font:inherit; width:92px; padding:2px 4px; border-radius:6px; text-align:center;
+  }
+  .updated input:hover,.updated input:focus{border-color:var(--line); background:#fff; outline:none;}
+
+  /* ---------- 进度条 ---------- */
+  .progress-card{
+    background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+    padding:14px 16px; margin:16px 0 18px; display:flex; align-items:center; gap:16px; flex-wrap:wrap;
+  }
+  .bar{flex:1; min-width:200px; height:8px; background:var(--line2); border-radius:99px; overflow:hidden;}
+  .bar > i{display:block; height:100%; background:linear-gradient(90deg,#3457d5,#12a594); border-radius:99px; transition:width .3s;}
+  .stat{font-size:13px; color:var(--text2);}
+  .stat b{color:var(--text); font-size:15px;}
+
+  /* ---------- Tabs ---------- */
+  .tabs{display:flex; gap:6px; margin-bottom:16px; flex-wrap:wrap;}
+  .tab{
+    padding:8px 16px; border-radius:99px; border:1px solid var(--line); background:#fff;
+    cursor:pointer; font-size:13.5px; color:var(--text2); transition:.15s;
+  }
+  .tab:hover{border-color:#c9cfd8;}
+  .tab.on{background:var(--text); border-color:var(--text); color:#fff; font-weight:500;}
+  .tab .cnt{opacity:.6; font-size:12px; margin-left:5px;}
+
+  /* ---------- 分组卡片 ---------- */
+  .group{
+    background:var(--card); border:1px solid var(--line); border-left:4px solid var(--p-none);
+    border-radius:var(--radius); padding:14px 16px 10px; margin-bottom:14px;
+  }
+  .group.p0{border-left-color:var(--p0);} .group.p1{border-left-color:var(--p1);}
+  .group.p2{border-left-color:var(--p2);} .group.pnone{border-left-color:#c8cede;}
+  .ghead{display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
+  .gtitle{
+    flex:1; min-width:180px; font-size:15px; font-weight:600; padding:4px 6px; margin:-4px -6px;
+    border:1px solid transparent; border-radius:6px;
+  }
+  .gtitle:hover{border-color:var(--line2);}
+  .gtitle:focus{border-color:var(--primary); outline:none; background:#fff;}
+  .gnote{
+    width:100%; font-size:12.5px; color:var(--text2); padding:4px 6px; margin:2px -6px 0;
+    border:1px solid transparent; border-radius:6px;
+  }
+  .gnote:focus{outline:none; border-color:var(--primary); background:#fff;}
+  .gnote:empty:before{content:"备注 / 关键节点…"; color:var(--text3);}
+
+  /* ---------- 条目 ---------- */
+  .items{list-style:none; margin:8px 0 0; padding:0;}
+  .item{
+    padding:6px 2px 4px; border-radius:8px; border-top:1px solid var(--line2);
+  }
+  .irow{display:flex; align-items:flex-start; gap:9px;}
+  .item:first-child{border-top:none;}
+  .item.dragging{opacity:.4;}
+  .item.over-top{box-shadow:inset 0 2px 0 var(--primary);}
+  .item.over-bottom{box-shadow:inset 0 -2px 0 var(--primary);}
+  .st{
+    flex:none; width:17px; height:17px; margin-top:3px; border-radius:5px; cursor:pointer;
+    border:1.8px solid #c3cad6; background:#fff; position:relative; transition:.15s;
+  }
+  .st:hover{border-color:var(--primary);}
+  .st[data-s="doing"]{border-color:var(--doing); background:var(--doing);}
+  .st[data-s="doing"]:after{content:""; position:absolute; inset:4px; background:#fff; border-radius:2px;}
+  .st[data-s="block"]{border-color:var(--block); background:var(--block);}
+  .st[data-s="block"]:after{content:"!"; position:absolute; inset:0; color:#fff; font-size:12px; font-weight:700; text-align:center; line-height:14px;}
+  .st[data-s="done"]{border-color:var(--done); background:var(--done);}
+  .st[data-s="done"]:after{content:"✓"; position:absolute; inset:0; color:#fff; font-size:12px; font-weight:700; text-align:center; line-height:14px;}
+  .txt{flex:1; padding:2px 4px; border-radius:6px; border:1px solid transparent; word-break:break-word;}
+  .txt:hover{border-color:var(--line2);}
+  .txt:focus{outline:none; border-color:var(--primary); background:#fff;}
+  .item[data-s="done"] .txt{color:var(--text3); text-decoration:line-through;}
+  .item[data-s="block"] .txt{color:var(--block);}
+  .icon-btn{
+    flex:none; border:none; background:transparent; cursor:pointer; color:var(--text3);
+    font-size:15px; line-height:1; padding:4px 5px; border-radius:6px; opacity:0; transition:.15s;
+  }
+  .item:hover .icon-btn,.ghead .icon-btn{opacity:1;}
+  .icon-btn:hover{background:var(--line2); color:var(--text);}
+  .drag{flex:none; cursor:grab; color:var(--text3); opacity:0; padding:4px 2px; font-size:13px;}
+  .item:hover .drag{opacity:.7;}
+
+  /* 条目级：完成百分比 / 备注行 */
+  .pct{
+    flex:none; width:50px; margin-top:2px; padding:3px 2px; text-align:center;
+    font:inherit; font-size:12.5px; color:var(--text2);
+    border:1px solid transparent; border-radius:6px; background:transparent;
+    -moz-appearance:textfield; appearance:textfield;
+  }
+  .pct:hover{border-color:var(--line2); background:#fff;}
+  .pct:focus{outline:none; border-color:var(--primary); background:#fff;}
+  .pct::-webkit-outer-spin-button,.pct::-webkit-inner-spin-button{-webkit-appearance:none; margin:0;}
+  .inote{
+    margin:1px 4px 0 60px; min-height:19px; padding:1px 6px;
+    font-size:12.5px; color:var(--text2);
+    border:1px solid transparent; border-radius:6px; word-break:break-word;
+  }
+  .inote:hover{border-color:var(--line2);}
+  .inote:focus{outline:none; border-color:var(--primary); background:#fff;}
+  .inote:empty:before{content:attr(data-ph); color:var(--text3); opacity:.65;}
+
+  .add{
+    width:100%; margin-top:6px; padding:7px 10px; font:inherit; font-size:13px; color:var(--text2);
+    border:1px dashed var(--line); border-radius:8px; background:#fbfcfd;
+  }
+  .add:focus{outline:none; border-color:var(--primary); background:#fff; color:var(--text);}
+
+  /* ---------- 控件 ---------- */
+  select.pri{
+    border:1px solid var(--line); border-radius:99px; padding:3px 8px; font:inherit; font-size:12px;
+    color:var(--text2); background:#fff; cursor:pointer;
+  }
+  select.pri:focus{outline:none; border-color:var(--primary);}
+  input.gpct{
+    flex:none; width:64px; text-align:center; border:1px solid var(--line); border-radius:99px;
+    padding:3px 4px; font:inherit; font-size:12px; color:var(--text2); background:#fff;
+    -moz-appearance:textfield; appearance:textfield;
+  }
+  input.gpct:hover{border-color:#c9cfd8;}
+  input.gpct:focus{outline:none; border-color:var(--primary);}
+  input.gpct::-webkit-outer-spin-button,input.gpct::-webkit-inner-spin-button{-webkit-appearance:none; margin:0;}
+  .btn{
+    border:1px solid var(--line); background:#fff; border-radius:8px; padding:7px 13px;
+    font:inherit; font-size:13px; color:var(--text2); cursor:pointer; transition:.15s;
+  }
+  .btn:hover{border-color:#c9cfd8; color:var(--text);}
+  .btn.primary{background:var(--primary); border-color:var(--primary); color:#fff;}
+  .btn.primary:hover{background:#2946ad;}
+  .empty{color:var(--text3); font-size:13px; padding:18px 4px; text-align:center;}
+
+  .toolbar{
+    position:fixed; left:0; right:0; bottom:0; background:rgba(255,255,255,.92);
+    backdrop-filter:blur(8px); border-top:1px solid var(--line); padding:10px 20px;
+    display:flex; gap:8px; justify-content:center; flex-wrap:wrap; z-index:20;
+  }
+  .toast{
+    position:fixed; left:50%; bottom:70px; transform:translateX(-50%) translateY(12px);
+    background:var(--text); color:#fff; padding:8px 16px; border-radius:8px; font-size:13px;
+    opacity:0; pointer-events:none; transition:.25s; z-index:30;
+  }
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+
+  details.help{
+    background:#fff; border:1px solid var(--line); border-radius:var(--radius);
+    padding:10px 16px; margin-bottom:16px; font-size:13px; color:var(--text2);
+  }
+  details.help summary{cursor:pointer; color:var(--text); font-weight:500; outline:none;}
+  details.help table{width:100%; border-collapse:collapse; margin-top:10px;}
+  details.help td,details.help th{border:1px solid var(--line2); padding:6px 10px; text-align:left;}
+  details.help th{background:#fafbfc;}
+  .sec-label{font-size:13px; color:var(--text3); margin:22px 0 8px; font-weight:500;}
+  .label-input{
+    border:1px solid var(--line); background:#fff; border-radius:8px; padding:5px 10px;
+    font:inherit; font-size:13px; color:var(--text); min-width:230px;
+  }
+  .label-input:focus{outline:none; border-color:var(--primary);}
+  .hide{display:none;}
+
+  /* ---------- 搜索 ---------- */
+  .searchbar{display:flex; gap:8px; align-items:center; margin:0 0 12px;}
+  .search-input{
+    flex:1; min-width:200px; border:1px solid var(--line); background:#fff; border-radius:10px;
+    padding:9px 12px; font:inherit; font-size:13.5px; color:var(--text);
+  }
+  .search-input:focus{outline:none; border-color:var(--primary); box-shadow:0 0 0 3px var(--primary-soft);}
+  .search-input::-webkit-search-cancel-button{cursor:pointer;}
+  mark{background:#fff2b8; color:inherit; border-radius:3px; padding:0 1px;}
+  .res{
+    background:var(--card); border:1px solid var(--line); border-radius:10px;
+    padding:8px 12px; margin-bottom:8px; cursor:pointer; transition:.15s;
+  }
+  .res:hover{border-color:#c9cfd8;}
+  .res-meta{font-size:12px; color:var(--text3); margin-bottom:2px;}
+  .res-item{display:flex; align-items:flex-start; gap:9px; padding:2px 2px;}
+  .res-item .txt{border-color:transparent; cursor:pointer;}
+  .res-item .txt:hover{border-color:transparent;}
+  .res-item[data-s="done"] .txt{color:var(--text3); text-decoration:line-through;}
+  @keyframes flashbg{ from{background:#fff2b8;} to{background:transparent;} }
+  .item.flash{animation:flashbg 1.6s ease-out; border-radius:8px;}
+
+  /* ---------- 周归档：按周折叠 ---------- */
+  .arch-bar{display:flex; align-items:center; gap:8px; margin:0 0 12px; flex-wrap:wrap;}
+  .arch-bar .hint{font-size:12.5px; color:var(--text3);}
+  .wk{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); margin-bottom:12px; overflow:hidden;}
+  .wkhead{display:flex; align-items:center; gap:10px; padding:12px 14px; cursor:pointer; user-select:none;}
+  .wkhead:hover{background:#fafbfc;}
+  .caret{flex:none; font-size:10px; color:var(--text3); transition:transform .15s;}
+  .wk.collapsed .caret{transform:rotate(-90deg);}
+  .wktitle{
+    flex:1; min-width:160px; font-size:14.5px; font-weight:600; padding:3px 6px; margin:-3px -6px;
+    border:1px solid transparent; border-radius:6px;
+  }
+  .wktitle:hover{border-color:var(--line2);}
+  .wktitle:focus{outline:none; border-color:var(--primary); background:#fff; cursor:text;}
+  .wkcount{flex:none; font-size:12px; color:var(--text2); background:var(--line2); border-radius:99px; padding:2px 9px;}
+  .wkbody{padding:2px 14px 14px; border-top:1px solid var(--line2);}
+  .wk.collapsed .wkbody{display:none;}
+  .wk .group{
+    background:#fafbfc; border:1px solid var(--line2); border-left:3px solid var(--p-none);
+    border-radius:8px; padding:10px 12px 6px; margin-top:12px;
+  }
+  .wk .group.p0{border-left-color:var(--p0);} .wk .group.p1{border-left-color:var(--p1);}
+  .wk .group.p2{border-left-color:var(--p2);} .wk .group.pnone{border-left-color:#c8cede;}
+  .wk .gtitle{font-size:13.5px;}
+  .wk .empty{padding:14px 4px;}
+
+  /* ---------- 当前任务（置顶） ---------- */
+  .cur-card{
+    background:var(--card); border:1px solid var(--line); border-left:4px solid var(--primary);
+    border-radius:var(--radius); padding:12px 16px; margin:16px 0 14px;
+  }
+  .cur-head{display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
+  .cur-title{font-size:14.5px; font-weight:600; display:flex; align-items:center; gap:7px;}
+  .cur-badge{font-size:11.5px; font-weight:500; color:var(--primary); background:var(--primary-soft); border-radius:99px; padding:1px 8px;}
+  .cur-hint{font-size:12px; color:var(--text3);}
+  .citems{list-style:none; margin:8px 0 0; padding:0;}
+  .citem{display:flex; align-items:flex-start; gap:9px; padding:7px 2px; border-top:1px solid var(--line2); border-radius:8px;}
+  .citem:first-child{border-top:none;}
+  .cbody{flex:1; min-width:0; display:flex; flex-direction:column; gap:3px; padding:1px 0;}
+  .src-chip{
+    align-self:flex-start; max-width:100%; border:none; background:var(--primary-soft); color:var(--primary);
+    font:inherit; font-size:11.5px; padding:2px 9px; border-radius:99px; cursor:pointer;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .src-chip:hover{background:#e0e7ff;}
+  .ctext{font-size:13.5px; word-break:break-word;}
+  .citem[data-s="done"] .ctext{color:var(--text3); text-decoration:line-through;}
+  .citem[data-s="block"] .ctext{color:var(--block);}
+  .cadd{display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;}
+  .cadd-input{
+    flex:1; min-width:190px; padding:7px 10px; font:inherit; font-size:13px; color:var(--text);
+    border:1px dashed var(--line); border-radius:8px; background:#fbfcfd;
+  }
+  .cadd-input:focus{outline:none; border-color:var(--primary); background:#fff;}
+  .cadd-group{
+    max-width:280px; border:1px solid var(--line); border-radius:8px; padding:6px 8px;
+    font:inherit; font-size:12.5px; color:var(--text2); background:#fff; cursor:pointer;
+  }
+  .cadd-group:focus{outline:none; border-color:var(--primary);}
+
+  /* 首次创建时间：浅色、右对齐、等宽数字 */
+  .ctime{
+    flex:none; font-size:11.5px; color:var(--text3); opacity:.85; padding-top:4px;
+    white-space:nowrap; text-align:right; min-width:74px; font-variant-numeric:tabular-nums;
+  }
+  .icon-btn.on{opacity:1; color:var(--p1);}
+  .icon-btn.on:hover{background:var(--line2);}
+  .icon-btn.vis{opacity:1;}
+
+  /* ---------- 日报 ---------- */
+  .day-card{
+    background:var(--card); border:1px solid var(--line); border-left:4px solid var(--p1);
+    border-radius:var(--radius); padding:12px 16px; margin:0 0 14px;
+  }
+  .day-head{display:flex; align-items:center; gap:10px; flex-wrap:wrap; cursor:pointer; user-select:none;}
+  .day-head .caret{flex:none; font-size:10px; color:var(--text3); transition:transform .15s;}
+  .day-card.collapsed .caret{transform:rotate(-90deg);}
+  .dinput{
+    border:1px solid var(--line); border-radius:8px; padding:3px 8px; font:inherit; font-size:12.5px;
+    color:var(--text2); background:#fff; cursor:pointer; user-select:auto;
+  }
+  .dinput:focus{outline:none; border-color:var(--primary);}
+  .dtext{
+    margin-top:10px; border:1px dashed var(--line); border-radius:8px; background:#fbfcfd;
+    padding:10px 12px; font-size:13.5px; line-height:1.95; white-space:pre-wrap; word-break:break-word;
+    color:var(--text); min-height:58px;
+  }
+  .dtext:hover{border-color:#c9cfd8;}
+  .dtext:focus{outline:none; border-color:var(--primary); background:#fff;}
+  .day-foot{display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:10px;}
+  .issue-row{display:flex; align-items:center; gap:8px; margin-top:8px; flex-wrap:wrap;}
+  .issue-input{
+    flex:1; min-width:200px; border:1px dashed var(--line); border-radius:8px; padding:6px 10px;
+    font:inherit; font-size:13px; color:var(--text); background:#fbfcfd;
+  }
+  .issue-input:focus{outline:none; border-color:var(--primary); background:#fff;}
+  .wh-input{
+    flex:1; min-width:210px; border:1px solid var(--line); border-radius:8px; padding:6px 10px;
+    font:inherit; font-size:12.5px; color:var(--text); background:#fff;
+  }
+  .wh-input:focus{outline:none; border-color:var(--primary);}
+  .wh-time{border:1px solid var(--line); border-radius:8px; padding:5px 8px; font:inherit; font-size:12.5px; color:var(--text2); background:#fff;}
+  .wh-time:focus{outline:none; border-color:var(--primary);}
+  .wh-chan{border:1px solid var(--line); border-radius:8px; padding:5px 6px; font:inherit; font-size:12.5px; color:var(--text2); background:#fff;}
+  .wh-chan:focus{outline:none; border-color:var(--primary);}
+  .wh-status{font-size:12px; color:var(--text3);}
+  .wh-log{
+    width:100%; font-size:12px; color:var(--text3); margin-top:4px; max-height:150px; overflow:auto;
+    border-top:1px dashed var(--line); padding-top:4px;
+  }
+  .wh-log div{line-height:1.55;}
+  .wh-log .ok{color:var(--p2);}
+  .wh-log .bad{color:var(--p0);}
+  .meter{font-size:12.5px; color:var(--text3); cursor:pointer; padding:2px 6px; border-radius:6px;}
+  .meter:hover{color:var(--text2); background:#fff;}
+  .day-card.collapsed .dtext,.day-card.collapsed .day-foot,.day-card.collapsed .issue-row{display:none;}
+
+  @media print{
+    .toolbar,.tabs,.icon-btn,.drag,.add,.ghead select,.updated input,.searchbar,.arch-bar,.cadd,.day-foot{display:none;}
+    .wk.collapsed .wkbody{display:block;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>待办管理</h1>
+    <span class="sub">彭俊铭 · 周 / 月 / 季</span>
+    <div class="spacer"></div>
+    <span class="updated">最近更新 <input id="updatedAt" type="text"></span>
+    <span class="meter" id="dataMeter" title="点击查看本地数据占用明细 / 清理历史缓存">数据 —</span>
+  </header>
+
+  <div class="cur-card" id="currentCard"></div>
+
+  <div class="day-card" id="dailyCard"></div>
+
+  <div class="progress-card">
+    <span class="stat">本周完成 <b id="wDone">0</b> / <b id="wAll">0</b></span>
+    <div class="bar"><i id="wBar" style="width:0%"></i></div>
+    <span class="stat" id="wPct">0%</span>
+  </div>
+
+  <div class="tabs" id="tabs"></div>
+
+  <div id="periodLabel" style="margin-bottom:12px;">
+    <input id="periodInput" class="label-input" type="text">
+  </div>
+
+  <div class="searchbar">
+    <input id="searchInput" class="search-input" type="search" placeholder="搜索任务（模糊匹配，空格分隔多关键词）…">
+    <button class="btn" id="btnClearSearch">清除</button>
+  </div>
+
+  <div class="arch-bar hide" id="archBar">
+    <span class="hint">按周折叠 · 点击周标题行展开 / 收起</span>
+    <div style="flex:1"></div>
+    <button class="btn" id="btnExpandAll">展开全部</button>
+    <button class="btn" id="btnCollapseAll">折叠全部</button>
+  </div>
+
+  <div id="results" class="hide"></div>
+
+  <div id="groups"></div>
+
+  <button class="btn" id="addGroup" style="margin-top:4px;">+ 新增分组</button>
+
+  <details class="help" style="margin-top:26px;">
+    <summary>维护说明 / 状态与优先级含义</summary>
+    <table>
+      <tr><th>动作</th><th>时机</th><th>做法</th></tr>
+      <tr><td>切换状态</td><td>随时</td><td>点左侧方块循环：未开始 → 进行中 → 阻塞 → 已完成；进日报范围 = 当天完成 + 所有进行中</td></tr>
+      <tr><td>新增条目</td><td>随时</td><td>在分组底部输入框输入后回车；本周排不下的写进「待办池」</td></tr>
+      <tr><td>周滚动</td><td>每周一</td><td>点「归档已完成」把完成项移入归档；再点「滚动到下一周」重置周次</td></tr>
+      <tr><td>看归档</td><td>随时</td><td>「周归档」按周分块，点周标题行展开 / 收起；块内保留原分组大标题</td></tr>
+      <tr><td>搜任务</td><td>随时</td><td>顶部搜索框模糊匹配全部任务（含归档），点结果可跳转到原位置并高亮</td></tr>
+      <tr><td>当前任务</td><td>随时</td><td>任务行点 ☆ 置顶到页面顶部「当前任务」；也可在此直接建临时任务并选一个关联大标题，销项与原任务同步</td></tr>
+      <tr><td>日报</td><td>随时 / 下班前</td><td>按「当天完成 + 所有进行中」自动生成工作简报：大标题即项目名分组、编号 1、2、3、每条带完成百分比与备注行、结尾「课题/协调事项」；可直接改，「一键复制」粘贴到企微或邮件</td></tr>
+      <tr><td>百分比 / 备注</td><td>随时</td><td>条目行右侧填完成百分比（填了才带进日报，不自动补）、条目下方写备注行（带进日报）；大标题右侧填项目进度百分比（手动、仅工具内查看，不进日报）</td></tr>
+      <tr><td>日报推送</td><td>每天 17:20</td><td>日报区可选通道：<b>Bark 手机推送</b>（填设备 Key，iPhone 装 Bark 后自取，<b>能返回真实成败</b>）或 <b>企微群机器人</b>（填 Webhook Key，跨域受限只能盲发）。保存后到点自动把当日日报发出去，<b>需保持本页处于打开状态</b>；每次推送会在配置行下方留一条记录</td></tr>
+      <tr><td>数据体检</td><td>需要时</td><td>点页头「数据 xx KB」看占用与明细：日报是按完成时间即时生成的派生数据，只有手改过的日子才占用空间；推送记录超过 90 天自动丢弃，任务与归档不会被自动删</td></tr>
+      <tr><td>同步 md</td><td>需要时</td><td>点「导出 Markdown」下载，覆盖 <code>项目管理/待办管理.md</code></td></tr>
+    </table>
+    <p style="margin:10px 0 4px;">
+      优先级：<b style="color:var(--p0)">P0</b> 必须完成 ｜
+      <b style="color:var(--p1)">P1</b> 推进 ｜
+      <b style="color:var(--p2)">P2</b> 有空再做<br>
+      数据自动保存在本浏览器（localStorage）；换电脑前请先「导出备份 JSON」。
+    </p>
+  </details>
+</div>
+
+<div class="toolbar">
+  <button class="btn primary" id="btnArchive">归档本周已完成</button>
+  <button class="btn" id="btnRoll">滚动到下一周</button>
+  <button class="btn" id="btnMd">导出 Markdown</button>
+  <button class="btn" id="btnExport">导出备份 JSON</button>
+  <button class="btn" id="btnImport">导入备份</button>
+  <input type="file" id="fileInput" accept=".json" class="hide">
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const KEY = 'gpm-todo-v1';
+const uid = () => Math.random().toString(36).slice(2, 9);
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ========== 初始数据 ========== */
+const DEFAULT = () => ({
+  updatedAt: '2026-08-31',
+  weekLabel: '2026-08-31 ~ 2026-09-06',
+  monthLabel: '2026 年 9 月',
+  quarterLabel: '2026 Q3（7 ~ 9 月）',
+  active: 'week',
+  pins: [],
+  dailies: {},
+  dailyIssues: {},
+  pushed: {},
+  dailyCollapsed: false,
+  week: [
+    { id: uid(), title: '数据冻结需求 —— 推动业务召开主流程评审会', pri: 'P0',
+      note: '目标：本周内把主流程评审会开掉，并按会上的结论收敛详设。', items: [
+        { id: uid(), text: '主流程流程图定稿：基于 完整冻结流程.drawio 更新（冻结发起→询价→成本核算判断→开模指令发放→PDM回传），标注与设变差异点、PDM/PSC 对接节点；输出评审会用版本', s: 'todo' },
+        { id: uid(), text: '详设文档修改：依据《开模冻结管理v1.1详设评审意见》《方案待定信息汇总表》逐条消项，目标版本 v1.2', s: 'todo' },
+        { id: uid(), text: '与业务确认详细需求并完成详设：确认冻结询价粒度、三三制核价触发条件、开模指令回传 PDM 字段；会后立即修订并发出评审版', s: 'todo' },
+        { id: uid(), text: '跟进 PSC 抓取不到新零件号的接口人对接（零件增减/数量变化）—— 梁俊', s: 'todo' },
+        { id: uid(), text: '与 PDM 侧确认数据下发字段及「开模指令已发放」回传信息', s: 'todo' }
+      ]},
+    { id: uid(), title: '启境项目零件接口蓝图设计', pri: 'P0',
+      note: '来源：会议纪要/8.28启境零件接口会议纪要.md 第五节待办事项（属于我的部分）。', items: [
+        { id: uid(), text: '确认两个上线时间点（答复曾文浩）：①先加启境主体+权限再上线接口 ②接口单独先上；权限涉及数据清理，需评估技术折中方案', s: 'todo' },
+        { id: uid(), text: '确认 GPM 是否有字段区分「售后件 / 整车件」（现状以工厂区分），结论决定是否需独立接口处理整车对外采价格', s: 'todo' },
+        { id: uid(), text: '调研 8.28 会议记录的问题并反馈结果：物料类型字段、供应商编码/名称、组织主体映射', s: 'todo' },
+        { id: uid(), text: '配合马健用正式环境数据查看接口字段（GPM 权限不足时由我协助取数）', s: 'todo' },
+        { id: uid(), text: '输出《启境项目零件接口蓝图设计》初稿：接口范围、数据流向（GPM 主动推送 SAP）、组织主体方案、字段口径', s: 'todo' }
+      ]},
+    { id: uid(), title: '其他', pri: 'P2', note: '', items: [
+        { id: uid(), text: '（预留：临时插入事项）', s: 'todo' }
+      ]}
+  ],
+  month: [
+    { id: uid(), title: '开模冻结模块按 9/30 上线倒排', pri: 'P0', note: '关键节点：详设定稿 → 评审通过 → 开发排期', items: [] },
+    { id: uid(), title: '数据冻结主流程评审通过、详设 v1.2 定稿', pri: 'P0', note: '节点：9 月上旬', items: [] },
+    { id: uid(), title: '冻结流程三大遗留课题有结论', pri: 'P1', note: '①流程归谁管 ②不可逆问题 ③冻结价与定点/提案价 gap 比对口径（推动人：杨科）', items: [] },
+    { id: uid(), title: '启境零件接口方案落地', pri: 'P1', note: '蓝图定稿 + 上线时间点承诺', items: [] },
+    { id: uid(), title: 'PDM / PSC 对接字段与回传机制全部确认', pri: 'P1', note: '8.25 会议纪要待办 6、8', items: [] },
+    { id: uid(), title: '详测阶段接口字段清单逐项落地', pri: 'P2', note: '产出物：冻结模块-页面字段清单与业务对接.xlsx', items: [] }
+  ],
+  quarter: [
+    { id: uid(), title: '开模冻结（数据冻结）模块上线', pri: 'P0', note: '9/30 上线，含 PDM 对接、开模指令发放与回传', items: [] },
+    { id: uid(), title: '冻结管理流程在业务侧定案', pri: 'P1', note: '管理归属（成本/采购/变更办）明确、上会评价机制明确', items: [] },
+    { id: uid(), title: '启境项目两个核心接口方案交付', pri: 'P1', note: '①零件价格目录下发 ②整车转移定价（MTOC 汇总）', items: [] },
+    { id: uid(), title: '启境主体与权限规划落地', pri: 'P2', note: 'GPM 增加启境组织主体、SAP 工厂映射（售后工厂 1100）', items: [] },
+    { id: uid(), title: '设变相关遗留问题收敛', pri: 'P2', note: '询报价转成本核算条件、工装编码链路等（见 产出物草稿/）', items: [] }
+  ],
+  pool: [
+    { id: uid(), title: '待办池（暂未排期 · 需跟踪他人）', pri: 'none', note: '', items: [
+        { id: uid(), text: '整车物料主数据是否接全量（评估工作量：王欣玓 / 曾文浩）', s: 'todo' },
+        { id: uid(), text: '埃安 SAP → 启境 SAP 转移定价链路打通（林志明 / 曾文浩）', s: 'todo' },
+        { id: uid(), text: '整车采购价格接口字段范围与供应链对齐（马健，需与虎哥确定）', s: 'todo' },
+        { id: uid(), text: '报价结果提前同步上游、与核价并行的风险机制（梁俊）', s: 'todo' },
+        { id: uid(), text: '冻结流程是否上会评价（分管 / 采购副总层级）', s: 'todo' }
+      ]}
+  ],
+  archive: [
+    { id: uid(), title: '2026-08-31 ~ 2026-09-06', collapsed: false, groups: [] }
+  ]
+});
+
+/* 兼容旧结构：归档周块由「扁平 items」升级为「按周分块 + 块内保留分组大标题」 */
+function migrate(d) {
+  if (!Array.isArray(d.archive)) d.archive = [];
+  if (!Array.isArray(d.pins)) d.pins = [];
+  if (!d.dailies || typeof d.dailies !== 'object') d.dailies = {};
+  if (!d.dailyIssues || typeof d.dailyIssues !== 'object') d.dailyIssues = {};
+  if (!d.pushed || typeof d.pushed !== 'object') d.pushed = {};
+  // 日报改为「派生数据」：只有手改过的日子才存；旧结构 {text, auto} 顺手瘦身
+  Object.keys(d.dailies).forEach(k => {
+    const r = d.dailies[k];
+    if (!r || typeof r !== 'object' || !('auto' in r)) return;
+    if (r.text === r.auto) delete d.dailies[k];
+    else d.dailies[k] = { text: r.text };
+  });
+  prunePushed(d);
+  d.archive = d.archive.map((w, i) => {
+    if (!Array.isArray(w.groups)) {
+      w.groups = [{ id: uid(), title: '未分类', pri: w.pri || 'none', note: '', items: w.items || [] }];
+      delete w.items;
+    }
+    w.groups.forEach(g => { if (!Array.isArray(g.items)) g.items = []; });
+    if (typeof w.collapsed !== 'boolean') w.collapsed = i !== 0;
+    return w;
+  });
+  ['week', 'month', 'quarter', 'pool'].forEach(k => {
+    (d[k] || []).forEach(g => { if (!Array.isArray(g.items)) g.items = []; });
+  });
+  return d;
+}
+
+const TABS = [
+  { k: 'week',    n: '本周待办' },
+  { k: 'month',   n: '当月目标' },
+  { k: 'quarter', n: '当季目标' },
+  { k: 'pool',    n: '待办池' },
+  { k: 'archive', n: '周归档' }
+];
+const STAT_CYCLE = ['todo', 'doing', 'block', 'done'];
+const PRI_CYCLE = ['P0', 'P1', 'P2', 'none'];
+
+let D = load();
+let searchQ = '';
+
+function load() {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (raw) return migrate(JSON.parse(raw));
+  } catch (e) { console.warn('读取本地数据失败', e); }
+  return DEFAULT();
+}
+let saveTimer = null;
+function save() {
+  clearTimeout(saveTimer); saveTimer = null;
+  D.updatedAt = new Date().toISOString().slice(0, 10);
+  try {
+    localStorage.setItem(KEY, JSON.stringify(D));
+  } catch (e) {
+    alert('本地存储写入失败（可能已满）：' + (e && e.name ? e.name : '未知错误') +
+      '\n建议先「导出备份 JSON」，再点顶部「数据 xx KB」清理历史缓存 / 删除旧归档周块。');
+  }
+  $('#updatedAt').value = D.updatedAt;
+}
+// 连续输入场景：合并写入，避免每敲一个字就整包序列化
+function saveSoon() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(save, 700);
+}
+
+/* ========== 数据访问（兼容归档的「周块 → 分组」两层结构） ========== */
+function tabItems(k) {
+  if (k === 'archive') return (D.archive || []).flatMap(w => (w.groups || []).flatMap(g => g.items || []));
+  return (D[k] || []).flatMap(g => g.items || []);
+}
+function findGroup(gid) {
+  if (D.active === 'archive') {
+    for (const w of (D.archive || [])) {
+      const g = (w.groups || []).find(x => x.id === gid);
+      if (g) return g;
+    }
+    return null;
+  }
+  return (D[D.active] || []).find(x => x.id === gid);
+}
+function removeGroup(gid) {
+  if (D.active === 'archive') {
+    (D.archive || []).forEach(w => { if (w.groups) w.groups = w.groups.filter(g => g.id !== gid); });
+  } else {
+    D[D.active] = (D[D.active] || []).filter(g => g.id !== gid);
+  }
+}
+function findItem(iid) {
+  let hit = null;
+  const scan = (list, tab, wid) => (list || []).forEach(g => {
+    if (hit) return;
+    const i = (g.items || []).find(x => x.id === iid);
+    if (i) hit = { tab, wid: wid || '', g, i };
+  });
+  ['week', 'month', 'quarter', 'pool'].forEach(k => { if (!hit) scan(D[k], k); });
+  (D.archive || []).forEach(w => { if (!hit) scan(w.groups, 'archive', w.id); });
+  return hit;
+}
+
+/* ========== 当前任务（置顶）：同一批任务对象的镜像视图，非独立副本 ========== */
+const TAB_NAME = { week: '本周待办', month: '当月目标', quarter: '当季目标', pool: '待办池', archive: '周归档' };
+let cDraft = '', cGroup = '';
+
+function nowIso() {
+  const d = new Date(), p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+// 首次创建时间展示：当年只显示 月-日，跨年补年份
+function fmtCreated(v) {
+  if (!v) return '';
+  const m = String(v).match(/^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2}))?/);
+  if (!m) return String(v);
+  const date = m[1] === String(new Date().getFullYear()) ? `${m[2]}-${m[3]}` : `${m[1]}-${m[2]}-${m[3]}`;
+  return m[4] ? `${date} ${m[4]}:${m[5]}` : date;
+}
+function togglePin(iid) {
+  if (!Array.isArray(D.pins)) D.pins = [];
+  const k = D.pins.indexOf(iid);
+  if (k >= 0) { D.pins.splice(k, 1); return false; }
+  D.pins.unshift(iid); return true;
+}
+// 可关联的大标题（跨本周 / 当月 / 当季 / 待办池）
+function groupOptions() {
+  const out = [];
+  [['week', '本周待办'], ['month', '当月目标'], ['quarter', '当季目标'], ['pool', '待办池']].forEach(([k, n]) => {
+    (D[k] || []).forEach(g => out.push(`<option value="${k}|${g.id}">${esc(n)} · ${esc(g.title)}</option>`));
+  });
+  return out.join('');
+}
+function jumpTo(tab, wid, iid) {
+  if (wid) { const w = (D.archive || []).find(x => x.id === wid); if (w) w.collapsed = false; }
+  D.active = tab; save(); render();
+  const el = document.querySelector(`.item[data-id="${iid}"]`);
+  if (!el) return;
+  el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  el.classList.add('flash');
+  setTimeout(() => el.classList.remove('flash'), 1600);
+}
+function renderCurrent() {
+  D.pins = (D.pins || []).filter(id => !!findItem(id));
+  const total = D.pins.length;
+  const doneN = D.pins.filter(id => { const h = findItem(id); return h && h.i.s === 'done'; }).length;
+
+  const rows = D.pins.map(id => {
+    const h = findItem(id); if (!h) return '';
+    const { g, i, tab } = h;
+    return `
+    <li class="citem" data-s="${i.s}" data-id="${i.id}">
+      <span class="st" data-s="${i.s}" title="切换状态（与原任务同步）"></span>
+      <div class="cbody">
+        <button class="src-chip" data-tab="${tab}" data-wid="${h.wid}" data-iid="${i.id}" title="跳到原位置">${esc(TAB_NAME[tab] || '')} · ${esc(g.title)}</button>
+        <div class="ctext">${esc(i.text)}</div>
+      </div>
+      <span class="ctime" title="${i.createdAt ? '首次创建：' + esc(i.createdAt) : '首次创建时间未记录'}">${fmtCreated(i.createdAt)}</span>
+      <button class="icon-btn vis" data-act="unpin" title="移出当前任务（原任务保留）">✕</button>
+    </li>`;
+  }).join('');
+
+  const head = `
+  <div class="cur-head">
+    <span class="cur-title">当前任务<span class="cur-badge">${total - doneN}</span></span>
+    <span class="cur-hint">共 ${total} 项${doneN ? ` · 已完成 ${doneN}` : ''} · 销项与原任务同步</span>
+    <div style="flex:1"></div>
+    ${doneN ? '<button class="btn" data-act="clear-done">清理已完成</button>' : ''}
+  </div>`;
+
+  const body = total ? `<ul class="citems">${rows}</ul>`
+    : `<div class="empty" style="padding:12px 4px;">暂无当前任务 · 点任意任务行右侧的 ☆ 加入，或在下方直接创建临时任务。</div>`;
+
+  const opts = groupOptions();
+  const add = opts ? `
+  <div class="cadd">
+    <input class="cadd-input" placeholder="临时任务：输入内容后回车，自动关联到所选大标题…">
+    <select class="cadd-group" title="关联到哪个大标题（需求 / 目标）">${opts}</select>
+    <button class="btn" data-act="add">添加</button>
+  </div>` : '';
+
+  $('#currentCard').innerHTML = head + body + add;
+
+  // 重建 DOM 后回填草稿与上次选择
+  const inp = $('#currentCard').querySelector('.cadd-input');
+  if (inp) inp.value = cDraft;
+  const sel = $('#currentCard').querySelector('.cadd-group');
+  if (sel) {
+    if (cGroup && [...sel.options].some(o => o.value === cGroup)) sel.value = cGroup;
+    cGroup = sel.value;
+  }
+}
+function addTempTask() {
+  const box = $('#currentCard');
+  const inp = box.querySelector('.cadd-input');
+  const sel = box.querySelector('.cadd-group');
+  const text = ((inp && inp.value) || '').trim();
+  if (!text) { if (inp) inp.focus(); return; }
+  if (!sel || !sel.value) { toast('请先选择一个关联大标题'); return; }
+  const [tab, gid] = sel.value.split('|');
+  const g = (D[tab] || []).find(x => x.id === gid);
+  if (!g) { toast('目标大标题不存在，请重新选择'); return; }
+  const it = { id: uid(), text, s: 'todo', createdAt: nowIso() };
+  g.items.push(it);
+  D.pins.unshift(it.id);
+  cDraft = '';
+  save(); render();
+  toast(`已创建并关联到「${g.title}」`);
+  const ni = document.querySelector('#currentCard .cadd-input');
+  if (ni) ni.focus();
+}
+
+/* ========== 日报 / 工作简报（当天完成 + 进行中自动成稿） ========== */
+const WH_KEY = 'gpm-todo-wecom';            // 推送配置单独存，不进备份 JSON，避免密钥外泄
+let dailyDate = '';
+let whCfg = loadWh();
+
+function todayStr() {
+  const d = new Date(), p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+function loadWh() {
+  try {
+    const c = JSON.parse(localStorage.getItem(WH_KEY)) || {};
+    if (!c.chan) c.chan = 'wecom';        // 旧配置默认走企微
+    if (!c.log) c.log = [];
+    return c;
+  } catch (e) { return { chan: 'wecom', log: [] }; }
+}
+/* 统一返回实际推送地址（存在性判断用）；Bark 允许只贴设备 Key，自动补全 */
+function whUrl() {
+  const v = (whCfg.url || '').trim();
+  if (!v) return '';
+  if (effChan() !== 'bark') {
+    return /^https?:\/\//i.test(v) ? v : `https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=${encodeURIComponent(v)}`;
+  }
+  const t = barkTarget();
+  return t && t.deviceKey ? 'https://' + t.host + '/' + t.deviceKey : '';
+}
+/* 通道自动识别：地址里只要出现 api.day.app，就按 Bark 处理（不依赖下拉是否正确） */
+function effChan() {
+  const v = (whCfg.url || '').trim();
+  if (/api\.day\.app/i.test(v)) return 'bark';
+  return whCfg.chan === 'bark' ? 'bark' : 'wecom';
+}
+/* 解析 Bark 目标。兼容四类输入：
+   ① 仅设备 Key            aGPNNEAk...
+   ② 国区版点连接          https://api.day.app.aGPNNEAk...
+   ③ 完整 GET 推送链接     https://api.day.app/<key>/<title>/<body>?...
+   ④ 自建服务器            https://bark.example.com/<key>...
+   返回 {host, deviceKey}，发送时 POST https://<host>/push（正文走 body，不受 URL 长度限制） */
+function barkTarget() {
+  const v = (whCfg.url || '').trim();
+  if (!v) return null;
+  if (!/^https?:\/\//i.test(v)) return { host: 'api.day.app', deviceKey: v };
+  const rest = v.replace(/^https?:\/\//i, '');
+  const qIdx = rest.indexOf('?');
+  const path = qIdx >= 0 ? rest.slice(0, qIdx) : rest;
+  const segs = path.split('/').filter(Boolean);
+  const host = segs[0] || '';
+  if (/^api\.day\.app\./i.test(host)) {                // ② 点连接
+    const p = host.split('.');
+    return { host: p.slice(0, 3).join('.'), deviceKey: p.slice(3).join('.') };
+  }
+  if (/^api\.day\.app$/i.test(host)) {                 // ③ 斜杠连接（含完整 GET 链接）
+    return { host: 'api.day.app', deviceKey: segs[1] || '' };
+  }
+  return { host: host, deviceKey: segs[1] || '' };     // ④ 自建服务器
+}
+/* 占位文案与通道名：跟随实际生效通道（含 URL 自动识别） */
+function pushPlaceholder() {
+  return effChan() === 'bark'
+    ? '粘贴 Bark 设备 Key 或 https://api.day.app/xxxx，留空则只本地保存日报'
+    : '粘贴 Webhook Key（或完整地址），留空则只本地保存日报';
+}
+function pushChanLabel() { return effChan() === 'bark' ? 'Bark 手机推送' : '企微机器人'; }
+function saveWhFromUI() {
+  const box = $('#dailyCard'); if (!box) return;
+  const u = box.querySelector('.wh-input'), t = box.querySelector('.wh-time'), c = box.querySelector('.wh-chan');
+  const keepLog = whCfg.log || [];
+  whCfg = {
+    chan: (c && c.value) || 'wecom',
+    url: (u ? u.value : '').trim(),
+    time: (t && t.value) || '17:20',
+    log: keepLog
+  };
+  localStorage.setItem(WH_KEY, JSON.stringify(whCfg));
+}
+function pushLog(line, ok) {
+  whCfg.log = whCfg.log || [];
+  whCfg.log.unshift({ t: new Date().toTimeString().slice(0, 5), d: todayStr(), m: line, ok: ok !== false });
+  whCfg.log = whCfg.log.slice(0, 12);
+}
+// 日报素材：当天「标记完成」的条目 + 当前「进行中」的条目（进行中只在今天生成，历史日期不重建）
+function collectDaily(dateStr) {
+  const isToday = dateStr === todayStr();
+  const out = [];
+  const scan = list => (list || []).forEach(g => (g.items || []).forEach(i => {
+    const doneDay = i.doneTime ? String(i.doneTime).slice(0, 10) : String(i.doneAt || '');
+    const isDone = i.s === 'done' && doneDay === dateStr;
+    const isDoingToday = i.s === 'doing' && isToday;
+    if (!isDone && !isDoingToday) return;
+    out.push({
+      text: i.text,
+      note: i.note || '',
+      pct: i.pct,
+      s: i.s,
+      gid: g.id,
+      gtitle: g.title || ''
+    });
+  }));
+  ['week', 'month', 'quarter', 'pool'].forEach(k => scan(D[k]));
+  (D.archive || []).forEach(w => scan(w.groups));
+  return out;      // 顺序 = 条目在列表中的原始顺序（组内顺序与列表一致）
+}
+// 大标题即项目名：同名大标题合并成一组，组顺序 = 该组最早一条的时间
+function groupDaily(items) {
+  const order = [], map = new Map();
+  items.forEach(it => {
+    const key = String(it.gtitle || '').trim() || '未分类';
+    if (!map.has(key)) { map.set(key, { label: key, items: [] }); order.push(key); }
+    map.get(key).items.push(it);
+  });
+  return order.map(k => map.get(k));
+}
+function genDaily(dateStr) {
+  const p = dateStr.split('-');
+  const head = `${Number(p[1])}月${Number(p[2])}日工作简报：`;
+  const items = collectDaily(dateStr);
+  const issue = ((D.dailyIssues || {})[dateStr] || '').trim();
+  const L = [head];
+  groupDaily(items).forEach(gr => {
+    L.push(`${gr.label}：`);
+    gr.items.forEach((x, n) => {
+      // 百分比只在手动填写时带出，不自动补（不出现默认 100%、不出现占位符）
+      const pct = x.pct === null || x.pct === undefined || x.pct === '' ? NaN : Number(x.pct);
+      const pctSeg = Number.isNaN(pct) ? '' : `，完成${pct}%`;
+      L.push(`${n + 1}、${x.text}${pctSeg}，进度正常；`);
+      if (x.note) L.push(`　备注：${x.note}`);
+    });
+  });
+  L.push(`课题/协调事项：${issue || '暂无'}`);
+  return L.join('\n');
+}
+/* 日报是「派生数据」：只要条目的完成时间还在，任何一天都能即时重建。
+   因此只有被手改过的日期才写进 D.dailies，其余不落库 —— 存储不随天数增长。 */
+function dailyOf(dateStr) {
+  const gen = genDaily(dateStr);
+  const rec = (D.dailies || {})[dateStr];
+  const edited = !!(rec && typeof rec.text === 'string' && rec.text !== gen);
+  return { text: edited ? rec.text : gen, gen: gen, edited: edited };
+}
+function setDailyText(dateStr, text) {
+  if (!D.dailies) D.dailies = {};
+  if (text === genDaily(dateStr)) delete D.dailies[dateStr];  // 改回与自动一致 → 恢复自动模式
+  else D.dailies[dateStr] = { text };
+}
+// 推送记录只用于判断「今天是否已推」，90 天前的自动丢弃
+function prunePushed(obj) {
+  const now = Date.now();
+  Object.keys((obj && obj.pushed) || {}).forEach(k => {
+    const t = Date.parse(k);
+    if (t && now - t > 90 * 864e5) delete obj.pushed[k];
+  });
+}
+function whStatusText(ds) {
+  const pushed = (D.pushed || {})[ds];
+  const t = whCfg.time || '17:20';
+  if (!whCfg.url) return `未配置${pushChanLabel()}（日报仅存在本页）`;
+  if (pushed) return `${ds === todayStr() ? '今日' : ds} 已推送 ${pushed}`;
+  if (ds !== todayStr()) return '历史日期不自动推送';
+  return `每天 ${t} 自动推送 · 需保持本页打开`;
+}
+function renderDaily() {
+  const box = $('#dailyCard'); if (!box) return;
+  const ds = dailyDate || todayStr();
+  const rec = dailyOf(ds);
+  const items = collectDaily(ds);
+  const nDoing = items.filter(x => x.s === 'doing').length;
+  const isToday = ds === todayStr();
+  const hint = rec.edited
+    ? '已手动编辑 · 新素材不再自动追加，点「重新生成」可覆盖'
+    : (items.length
+      ? (isToday ? `今日完成 + 进行中（${nDoing} 项）自动生成 · 可直接编辑` : '历史日报 · 可直接编辑')
+      : (isToday ? '今天还没有完成 / 进行中的条目' : '该日无完成项'));
+  const issue = (D.dailyIssues || {})[ds] || '';
+  box.className = 'day-card' + (D.dailyCollapsed ? ' collapsed' : '');
+  box.innerHTML = `
+  <div class="day-head" title="点击标题行展开 / 收起">
+    <span class="caret">▼</span>
+    <span class="cur-title">日报<span class="cur-badge">${items.length}</span></span>
+    <input class="dinput" type="date" value="${ds}" title="切换日期，查看历史日报">
+    <span class="cur-hint">${hint}</span>
+    <div style="flex:1"></div>
+    <button class="btn" data-act="regen" title="按当天完成 + 进行中的条目重新生成（会覆盖手改内容）">重新生成</button>
+    <button class="btn primary" data-act="copy" title="复制日报全文">一键复制</button>
+  </div>
+  <div class="dtext" contenteditable="true" spellcheck="false"></div>
+  <div class="issue-row">
+    <span class="cur-hint">课题/协调事项</span>
+    <input class="issue-input" placeholder="今天要上报的课题 / 协调事项，留空 = 暂无…" value="${esc(issue)}">
+  </div>
+  <div class="day-foot">
+    <span class="cur-hint">日报推送<sup style="opacity:.45;font-size:10px" title="代码版本，用于确认浏览器已加载最新文件">v8</sup></span>
+    <select class="wh-chan" title="推送通道（粘贴 Bark 地址会自动切到 Bark）">
+      <option value="wecom"${effChan() === 'wecom' ? ' selected' : ''}>企微机器人</option>
+      <option value="bark"${effChan() === 'bark' ? ' selected' : ''}>Bark 手机推送</option>
+    </select>
+    <input class="wh-input" type="password" autocomplete="off" placeholder="${esc(pushPlaceholder())}" value="${esc(whCfg.url || '')}">
+    <input class="wh-time" type="time" value="${whCfg.time || '17:20'}" title="每天自动推送时间">
+    <button class="btn" data-act="wh-save">保存</button>
+    <button class="btn" data-act="push-test">测试</button>
+    <button class="btn" data-act="push-now">立即推送日报</button>
+    <button class="btn" data-act="diag" title="自检推送链路：把浏览器环境、地址解析、三种发送方式的结果逐条写进下方日志，便于截图定位">诊断</button>
+    <span class="wh-status">${esc(whStatusText(ds))}</span>
+    ${(whCfg.log && whCfg.log.length) ? `<div class="wh-log">${whCfg.log.map(x => `<div class="${x.ok ? 'ok' : 'bad'}">${esc(x.d)} ${esc(x.t)} ${esc(x.m)}</div>`).join('')}</div>` : ''}
+  </div>`;
+  const el = box.querySelector('.dtext');
+  if (el && el.innerText !== rec.text) el.innerText = rec.text;
+}
+function regenDaily() {
+  const ds = dailyDate || todayStr();
+  if (dailyOf(ds).edited && !confirm('重新生成会覆盖你手改过的内容，确定继续？')) return;
+  if (D.dailies) delete D.dailies[ds];        // 丢弃手改版，回到「按当天完成 + 进行中即时生成」
+  save(); render(); toast('已按当天完成 + 进行中的条目重新生成');
+}
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); return true; } catch (e) { /* 继续兜底 */ }
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.left = '-9999px';
+    document.body.appendChild(ta); ta.select();
+    const ok = document.execCommand('copy');
+    ta.remove();
+    if (ok) return true;
+  } catch (e) { /* 继续兜底 */ }
+  return false;
+}
+/* 隐藏表单提交（不用 fetch，因此完全不受 CORS 约束）。
+   表单提交属于「导航」而不是「跨域请求」，浏览器不做同源检查，
+   所以它在 file:// 页面里、在 Safari / Chrome 下都能真正把请求发到服务器。
+   代价是读不到响应 —— 但"能发出去"比"能读回执"重要得多。 */
+function formPostIframe(url, fields) {
+  const name = 'push_sink_' + Date.now();
+  const ifr = document.createElement('iframe');
+  ifr.name = name;
+  ifr.style.cssText = 'position:absolute;width:0;height:0;border:0;visibility:hidden';
+  document.body.appendChild(ifr);
+  const f = document.createElement('form');
+  f.method = 'POST';
+  f.action = url;
+  f.target = name;
+  f.enctype = 'application/x-www-form-urlencoded';
+  f.acceptCharset = 'UTF-8';
+  Object.keys(fields).forEach(k => {
+    const i = document.createElement('input');
+    i.type = 'hidden'; i.name = k; i.value = fields[k];
+    f.appendChild(i);
+  });
+  document.body.appendChild(f);
+  f.submit();                                  // 立即触发，正文走 body，无长度限制
+  setTimeout(() => { try { f.remove(); ifr.remove(); } catch (e) { /* 忽略 */ } }, 10000);
+  return true;
+}
+/* 图片探针：用 <img> 加载推送 URL —— 图片请求同样不受 CORS 约束。
+   缺点：参数只能放 URL 里，正文过长会被服务器拒（431），故只用于兜底且需截断。 */
+function imgBeacon(url) {
+  return new Promise(resolve => {
+    const img = new Image();
+    let done = false;
+    const fin = ok => { if (!done) { done = true; resolve(ok); } };
+    img.onload = () => fin(true);
+    img.onerror = () => fin(true);             // 跨域图片读不到内容，onerror 也说明请求已到达
+    setTimeout(() => fin(true), 4000);
+    img.src = url;
+  });
+}
+async function sendWecom(url, content) {
+  // 正文上限：Bark 单条上限约 4KB，留出 JSON 结构余量
+  const body = content.length > 3500 ? content.slice(0, 3500) + '…（内容过长已截断）' : content;
+  const title = `工作简报 ${todayStr()}`;
+
+  if (effChan() === 'bark') {
+    const t = barkTarget();
+    if (!t || !t.deviceKey) return { ok: false, msg: '没能从地址里识别出 Bark 设备 Key', via: '解析失败' };
+    const endpoint = 'https://' + t.host + '/push';
+    const fields = { device_key: t.deviceKey, title: title, body: body, group: '待办日报' };
+    const form = new URLSearchParams(fields).toString();
+    const safariFile = /^file:$/.test(location.protocol)
+      && /Safari\//.test(navigator.userAgent) && !/Chrome|Chromium|Edg\//.test(navigator.userAgent);
+    // 发送策略：能校验的优先，校验不了就退到「一定能发出」的方式。
+    //   ① fetch + form-urlencoded + mode:'cors' —— 能读到回执，但 file:// 页面常被浏览器整条拦掉
+    //      （Safari 报 Load failed，Chrome 亦不稳定），只在它成功时才敢说"已送达"。
+    //   ② 隐藏表单提交 —— 表单是「导航」不是「跨域请求」，**不受 CORS 约束**，
+    //      在 file:// 下 Safari/Chrome 都能真正发出，正文走 body 无长度限制。
+    //      读不到回执，但不再出现"fetch 假成功、实际被丢弃"的问题。
+    //   ③ <img> 图片探针 —— 最后的兜底，正文截断后塞 URL。
+    let e1 = '';
+    try {
+      const r = await fetch(endpoint, {
+        method: 'POST', mode: 'cors',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: form
+      });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok && j.code === 200) return { ok: true, msg: 'Bark 已接收（服务端已确认）', via: '①可校验' };
+      return { ok: false, msg: `Bark 拒绝：${j.message || ('HTTP ' + r.status)}`, via: '①可校验' };
+    } catch (e) { e1 = (e && e.message) || '跨域被拦'; }
+    try {
+      formPostIframe(endpoint, fields);
+      return {
+        ok: true,
+        msg: '已用隐藏表单发出（' + (safariFile ? 'Safari 会拦 fetch，但表单提交不受影响' : '此方式不受跨域限制')
+           + '；本浏览器读不到回执，是否送达请看手机）',
+        via: '②表单盲发'
+      };
+    } catch (e2) { /* 继续降级 */ }
+    try {
+      const short = body.length > 300 ? body.slice(0, 300) + '…' : body;
+      await imgBeacon('https://' + t.host + '/' + encodeURIComponent(t.deviceKey)
+        + '/' + encodeURIComponent(title) + '/' + encodeURIComponent(short)
+        + '?group=' + encodeURIComponent('待办日报'));
+      return { ok: true, msg: '已用图片探针发出（是否送达请看手机）', via: '③图片探针' };
+    } catch (e3) { /* 继续降级 */ }
+    return { ok: false, msg: '三种方式都没发出去（' + e1 + '）', via: '全部失败' };
+  }
+
+  // 企微群机器人：无 CORS 头，只能 no-cors 盲发（fetch 抛错=请求根本没发出）
+  const raw = JSON.stringify({ msgtype: 'text', text: { content: body } });
+  try {
+    await fetch(url, {
+      method: 'POST', mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+      body: raw
+    });
+    return { ok: true, msg: '已提交（企微盲发，无法校验）', via: '盲发' };
+  } catch (e) {
+    const ok = navigator.sendBeacon
+      && navigator.sendBeacon(url, new Blob([raw], { type: 'text/plain;charset=UTF-8' }));
+    return ok ? { ok: true, msg: '已通过 Beacon 补发', via: 'Beacon' }
+              : { ok: false, msg: '推送失败（网络不通）：' + (e.message || '网络异常'), via: '失败' };
+  }
+}
+async function pushWecom(kind, auto) {
+  saveWhFromUI();      // 先落盘当前输入，避免"填了没保存"导致看起来没反应
+  const label0 = kind === 'test' ? '测试消息' : '日报';
+  const url = whUrl();
+  if (!url) {
+    // 失败也要留痕 + 刷新，不能"静默无反应"
+    pushLog(`${label0} 未发出：推送地址为空`, false);
+    localStorage.setItem(WH_KEY, JSON.stringify(whCfg));
+    render();
+    toast(`请先填写${pushChanLabel()}地址`);
+    return;
+  }
+  const t = todayStr();
+  const content = kind === 'test'
+    ? `【测试推送】待办管理已连通 · ${t} ${new Date().toTimeString().slice(0, 5)}`
+    : dailyOf(t).text;
+  const r = await sendWecom(url, content);
+  pushLog(`${label0} ${r.msg}${r.via ? '（' + r.via + '）' : ''}`, r.ok);
+  localStorage.setItem(WH_KEY, JSON.stringify(whCfg));
+  if (kind !== 'test' && r.ok) {
+    D.pushed = D.pushed || {};
+    D.pushed[t] = new Date().toTimeString().slice(0, 5);
+  }
+  // 关键修复：无论成功还是失败都立刻 save+render，
+  // 否则测试成功时界面毫无变化，看起来就像"点了没反应"（必须手动重载才能看到日志）。
+  save();
+  render();
+  toast(r.ok ? `✅ ${r.msg}` : `❌ ${r.msg}`);
+}
+/* 推送链路自检：把判定所需的全部事实逐条写进日志区（可截图），
+   覆盖「页面环境 / 地址解析 / 三种发送方式各自的结果」，
+   避免再靠"有没有反应"这种模糊现象来回试。 */
+async function runDiag() {
+  try {
+    const ua = (navigator.userAgent.match(/(Edg|Chrome|Firefox|Safari)\/[\d.]+/) || ['未知浏览器'])[0];
+    const isSafari = /Safari\//.test(navigator.userAgent) && !/Chrome|Chromium|Edg\//.test(navigator.userAgent);
+    const ch = effChan();
+    // 日志里出现的设备 Key 一律打码，避免整串明文留在屏幕上
+    const tk = barkTarget();
+    let masked = (whCfg.url || '').replace(/([?&](key|device_key)=)[^&]+/gi, '$1***');
+    if (tk && tk.deviceKey) masked = masked.split(tk.deviceKey).join(tk.deviceKey.slice(0, 6) + '***' + tk.deviceKey.slice(-4));
+    pushLog(`自检 · 环境 ${location.protocol}// · ${ua}`, true);
+    pushLog(`自检 · 通道=${ch} · 地址=${masked ? masked.slice(0, 48) : '（空）'}`, !!masked);
+    if (isSafari && location.protocol === 'file:') {
+      pushLog('自检 · ⚠ Safari 打开 file:// 页面：fetch 会被拦（回执读不到），推送会自动改用②隐藏表单发送；想看真实成功/失败回执，建议把本文件放到 https 访问（如 GitHub Pages）', false);
+    }
+    if (ch !== 'bark') { pushLog('自检 · 企微通道仅支持盲发，无更多可诊断项', true); }
+    else {
+      const t = barkTarget();
+      const keyOk = !!(t && t.deviceKey);
+      pushLog(`自检 · 解析 host=${t ? t.host : '×'} · key=${keyOk ? t.deviceKey.slice(0, 6) + '***' + t.deviceKey.slice(-4) : '×'}`, keyOk);
+      if (keyOk) {
+        const ep = 'https://' + t.host + '/push';
+        // 先单独探测「本浏览器能否从 file:// 页面读到 api.day.app 的响应」。
+        // 用超短 GET：GET 同属简单请求、不涉及预检，因此它被拦 = 浏览器彻底禁止
+        // file:// 页面的跨域读取（Safari 常如此）；它通过 = 只是 POST 那条路的问题。
+        try {
+          const r0 = await fetch('https://' + t.host + '/' + encodeURIComponent(t.deviceKey)
+            + '/' + encodeURIComponent('自检') + '/' + encodeURIComponent('CORS读取能力探测'),
+            { method: 'GET', mode: 'cors', cache: 'no-store' });
+          const j0 = await r0.json().catch(() => ({}));
+          pushLog(`自检 · CORS读取能力：HTTP ${r0.status} ${JSON.stringify(j0)}`, r0.ok);
+        } catch (e0) {
+          pushLog('自检 · CORS读取能力：被浏览器拦截（' + ((e0 && e0.message) || '跨域') + '）', false);
+        }
+        const form = new URLSearchParams({
+          device_key: t.deviceKey, title: '待办管理自检',
+          body: '诊断消息 · ' + new Date().toTimeString().slice(0, 5), group: '待办日报'
+        }).toString();
+        try {
+          const r = await fetch(ep, {
+            method: 'POST', mode: 'cors',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: form
+          });
+          const j = await r.json().catch(() => ({}));
+          pushLog(`自检 · ①可校验通道：HTTP ${r.status} ${JSON.stringify(j)}`, r.ok && j.code === 200);
+        } catch (e) { pushLog('自检 · ①可校验通道被拦：' + ((e && e.message) || '跨域被拦'), false); }
+        try {
+          formPostIframe(ep, {
+            device_key: t.deviceKey, title: '待办管理自检',
+            body: '诊断②表单盲发 · ' + new Date().toTimeString().slice(0, 5), group: '待办日报'
+          });
+          pushLog('自检 · ②表单盲发：已提交（表单不受跨域限制，是最可靠的发送方式；但读不到回执）', true);
+        } catch (e2) { pushLog('自检 · ②表单盲发失败：' + ((e2 && e2.message) || '异常'), false); }
+        try {
+          await imgBeacon('https://' + t.host + '/' + encodeURIComponent(t.deviceKey)
+            + '/' + encodeURIComponent('自检③图片探针')
+            + '/' + encodeURIComponent('诊断 · ' + new Date().toTimeString().slice(0, 5)));
+          pushLog('自检 · ③图片探针：请求已发出', true);
+        } catch (e3) { pushLog('自检 · ③图片探针失败', false); }
+        pushLog('自检 · 判定：只有①读到 HTTP 200 才是"服务端已确认"；②③只保证请求发出去了，是否送达以手机为准', true);
+      }
+    }
+  } catch (e) {
+    pushLog('自检异常：' + ((e && e.message) || String(e)), false);
+  }
+  localStorage.setItem(WH_KEY, JSON.stringify(whCfg));
+  render();
+  toast('诊断完成，结果见下方日志（可截图）');
+}
+// 到点自动推送；当天已推送过则不重复；页面晚于推送时间打开会自动补推一次
+function tickPush() {
+  if (!whUrl()) return;
+  try {
+    const o = JSON.parse(localStorage.getItem(KEY) || '{}');
+    if (o.pushed) D.pushed = Object.assign(o.pushed, D.pushed || {});
+  } catch (e) { /* 忽略 */ }
+  const t = todayStr();
+  if ((D.pushed || {})[t]) return;
+  const [hh, mm] = (whCfg.time || '17:20').split(':').map(Number);
+  const now = new Date();
+  if (now.getHours() * 60 + now.getMinutes() < (hh || 17) * 60 + (mm || 0)) return;
+  const hasIssue = ((D.dailyIssues || {})[t] || '').trim();
+  if (!collectDaily(t).length && !hasIssue) return;   // 当天没有素材就不打扰
+  pushWecom('daily', true);
+}
+/* 精确定时：只在推送时刻醒来一次，不做 30 秒空转轮询；
+   页面重新可见（含合盖唤醒）时校准一次，晚了就自动补推。 */
+let pushTimer = null;
+function schedulePush() {
+  clearTimeout(pushTimer);
+  if (!whUrl()) return;
+  prunePushed(D);
+  const now = new Date();
+  const [hh, mm] = (whCfg.time || '17:20').split(':').map(Number);
+  const at = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hh || 17, mm || 0, 0);
+  if (now >= at) { tickPush(); at.setDate(at.getDate() + 1); }
+  pushTimer = setTimeout(() => { tickPush(); schedulePush(); }, Math.max(1000, at - now));
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) tickPush(); });
+
+/* ---- 本地数据体检：占用体积 + 明细 + 手动清理派生缓存 ---- */
+function dataStats() {
+  const cnt = list => (list || []).reduce((n, g) => n + (g.items || []).length, 0);
+  return {
+    kb: +(new Blob([JSON.stringify(D)]).size / 1024).toFixed(1),
+    cur: ['week', 'month', 'quarter', 'pool'].reduce((n, k) => n + cnt(D[k]), 0),
+    arch: (D.archive || []).reduce((n, w) => n + (w.groups || []).reduce((m, g) => m + (g.items || []).length, 0), 0),
+    daily: Object.keys(D.dailies || {}).length,
+    pushed: Object.keys(D.pushed || {}).length
+  };
+}
+function renderMeter() {
+  const el = $('#dataMeter'); if (!el) return;
+  el.textContent = `数据 ${dataStats().kb} KB`;
+}
+$('#dataMeter').addEventListener('click', () => {
+  const s = dataStats();
+  const msg = [
+    '本地数据体检（存在浏览器 localStorage，上限约 5 MB）',
+    '',
+    `当前占用：${s.kb} KB`,
+    `在办条目：${s.cur} 条（本周 / 当月 / 当季 / 待办池）`,
+    `归档条目：${s.arch} 条`,
+    `日报手改记录：${s.daily} 天（未手改的日报不落库，按完成时间即时生成）`,
+    `企微推送记录：${s.pushed} 天`,
+    '',
+    '点「确定」清理派生缓存：删除 180 天前的日报手改记录、90 天前的推送记录。',
+    '任务与归档属于原始数据，不会被自动删除。'
+  ].join('\n');
+  if (!confirm(msg)) return;
+  const now = Date.now();
+  let n = 0;
+  Object.keys(D.dailies || {}).forEach(k => { const t = Date.parse(k); if (t && now - t > 180 * 864e5) { delete D.dailies[k]; n++; } });
+  Object.keys(D.pushed || {}).forEach(k => { const t = Date.parse(k); if (t && now - t > 90 * 864e5) { delete D.pushed[k]; n++; } });
+  save(); render();
+  toast(n ? `已清理 ${n} 条历史缓存` : '没有需要清理的缓存');
+});
+
+// 销项 / 撤销售项：同步记录完成时间，供日报与归档使用
+function cycleStatus(it) {
+  const from = it.s;
+  it.s = STAT_CYCLE[(STAT_CYCLE.indexOf(from) + 1) % STAT_CYCLE.length];
+  if (it.s === 'done' && from !== 'done') { it.doneAt = todayStr(); it.doneTime = nowIso(); }
+  if (it.s !== 'done' && from === 'done') { delete it.doneAt; delete it.doneTime; }
+  return it.s;
+}
+
+/* ========== 渲染 ========== */
+function render() {
+  $('#updatedAt').value = D.updatedAt;
+  renderMeter();
+  renderCurrent();
+  renderDaily();
+  const q = searchQ.trim();
+  const searching = q.length > 0;
+
+  // tabs
+  $('#tabs').innerHTML = TABS.map(t => {
+    const list = tabItems(t.k);
+    const n = t.k === 'archive' ? list.length : list.filter(i => i.s !== 'done').length;
+    return `<button class="tab ${D.active === t.k ? 'on' : ''}" data-k="${t.k}">${t.n}<span class="cnt">${n}</span></button>`;
+  }).join('');
+
+  // 周期标签
+  const labelKey = { week: 'weekLabel', month: 'monthLabel', quarter: 'quarterLabel' }[D.active];
+  if (labelKey && !searching) {
+    $('#periodLabel').classList.remove('hide');
+    $('#periodInput').value = D[labelKey];
+  } else {
+    $('#periodLabel').classList.add('hide');
+  }
+
+  // 进度（仅本周）
+  const wItems = tabItems('week');
+  const done = wItems.filter(i => i.s === 'done').length;
+  const pct = wItems.length ? Math.round(done / wItems.length * 100) : 0;
+  $('#wDone').textContent = done; $('#wAll').textContent = wItems.length;
+  $('#wBar').style.width = pct + '%'; $('#wPct').textContent = pct + '%';
+
+  // 搜索结果 / 分组列表 二选一
+  $('#groups').classList.toggle('hide', searching);
+  $('#archBar').classList.toggle('hide', searching || D.active !== 'archive');
+  $('#results').classList.toggle('hide', !searching);
+  $('#addGroup').classList.toggle('hide', searching || D.active === 'archive');
+
+  if (searching) {
+    $('#results').innerHTML = searchHTML(q);
+    return;
+  }
+  $('#results').innerHTML = '';
+
+  if (D.active === 'archive') {
+    $('#groups').innerHTML = (D.archive || []).length
+      ? D.archive.map(weekHTML).join('')
+      : `<div class="empty">暂无归档，点底部「归档本周已完成」开始积累。</div>`;
+  } else {
+    const groups = D[D.active] || [];
+    $('#groups').innerHTML = groups.length ? groups.map(groupHTML).join('')
+      : `<div class="empty">暂无内容，点下方「+ 新增分组」开始。</div>`;
+  }
+}
+
+/* 归档：一个周块 = 一个可折叠卡片，块内保留本周原有的分组大标题 */
+function weekHTML(w) {
+  const gs = w.groups || [];
+  const cnt = gs.reduce((n, g) => n + (g.items || []).length, 0);
+  const body = gs.length ? gs.map(groupHTML).join('')
+    : `<div class="empty">本周暂无归档内容</div>`;
+  return `
+  <div class="wk ${w.collapsed ? 'collapsed' : ''}" data-w="${w.id}">
+    <div class="wkhead" title="点击展开 / 收起">
+      <span class="caret">▼</span>
+      <div class="wktitle" contenteditable="true">${esc(w.title)}</div>
+      <span class="wkcount">${cnt} 项</span>
+      <button class="icon-btn" data-act="del-week" title="删除整周归档">✕</button>
+    </div>
+    <div class="wkbody">${body}</div>
+  </div>`;
+}
+
+function groupHTML(g) {
+  const pins = D.pins || [];
+  const items = (g.items || []).map(i => {
+    const pin = pins.includes(i.id);
+    return `
+    <li class="item" data-s="${i.s}" draggable="true" data-id="${i.id}" data-g="${g.id}">
+      <div class="irow">
+        <span class="drag" title="拖拽排序">⋮⋮</span>
+        <span class="st" data-s="${i.s}" title="切换状态"></span>
+        <div class="txt" contenteditable="true">${esc(i.text)}</div>
+        <input class="pct" type="number" min="0" max="100" placeholder="%" value="${i.pct === undefined || i.pct === null ? '' : i.pct}" title="完成百分比（手动填写，填了才带进日报）">
+        <span class="ctime" title="${i.createdAt ? '首次创建：' + esc(i.createdAt) : '首次创建时间未记录'}">${fmtCreated(i.createdAt)}</span>
+        <button class="icon-btn ${pin ? 'on' : ''}" data-act="pin" title="${pin ? '移出当前任务' : '加入当前任务'}">${pin ? '★' : '☆'}</button>
+        <button class="icon-btn" data-act="del-item" title="删除">✕</button>
+      </div>
+      <div class="inote" contenteditable="true" data-ph="备注行（写今日进展，会带进日报）…">${esc(i.note || '')}</div>
+    </li>`;
+  }).join('');
+  return `
+  <div class="group ${(g.pri || 'none').toLowerCase()}" data-g="${g.id}">
+    <div class="ghead">
+      <div class="gtitle" contenteditable="true">${esc(g.title)}</div>
+      <input class="gpct" type="number" min="0" max="100" placeholder="进度%" value="${g.pct === undefined || g.pct === null ? '' : g.pct}" title="项目进度百分比（手动填写，仅工具内查看）">
+      <select class="pri">
+        ${PRI_CYCLE.map(p => `<option value="${p}" ${g.pri === p ? 'selected' : ''}>${p === 'none' ? '无优先级' : p}</option>`).join('')}
+      </select>
+      <button class="icon-btn" data-act="del-group" title="删除分组">✕</button>
+    </div>
+    <div class="gnote" contenteditable="true">${esc(g.note || '')}</div>
+    <ul class="items">${items}</ul>
+    <input class="add" placeholder="+ 添加条目后回车（留则回车换行）…">
+  </div>`;
+}
+
+/* ========== 事件 ========== */
+$('#tabs').addEventListener('click', e => {
+  const t = e.target.closest('.tab'); if (!t) return;
+  D.active = t.dataset.k; save(); render();
+});
+
+$('#periodInput').addEventListener('input', e => {
+  const k = { week: 'weekLabel', month: 'monthLabel', quarter: 'quarterLabel' }[D.active];
+  if (k) { D[k] = e.target.value; saveSoon(); }
+});
+$('#updatedAt').addEventListener('change', e => { D.updatedAt = e.target.value; save(); });
+
+$('#addGroup').addEventListener('click', () => {
+  if (D.active === 'archive') return;
+  D[D.active].push({ id: uid(), title: '新分组', pri: 'P1', note: '', items: [] });
+  save(); render();
+  const gs = document.querySelectorAll('.group');
+  const last = gs[gs.length - 1];
+  if (last) { last.querySelector('.gtitle').focus(); document.execCommand('selectAll', false, null); }
+});
+
+// 周块：点击标题行折叠 / 展开
+$('#groups').addEventListener('click', e => {
+  const head = e.target.closest('.wkhead'); if (!head) return;
+  if (e.target.closest('[data-act]') || e.target.classList.contains('wktitle')) return;
+  const w = (D.archive || []).find(x => x.id === head.closest('.wk').dataset.w);
+  if (!w) return;
+  w.collapsed = !w.collapsed; save(); render();
+});
+
+$('#groups').addEventListener('click', e => {
+  const btn = e.target.closest('[data-act]'); if (!btn) return;
+  const act = btn.dataset.act;
+  if (act === 'del-week') {
+    const w = (D.archive || []).find(x => x.id === btn.closest('.wk').dataset.w);
+    if (!w) return;
+    const n = (w.groups || []).reduce((s, g) => s + (g.items || []).length, 0);
+    if (!confirm(`删除「${w.title}」整周归档（${n} 条）？`)) return;
+    D.archive = D.archive.filter(x => x.id !== w.id);
+    save(); render(); return;
+  }
+  if (act === 'pin') {
+    togglePin(btn.closest('.item').dataset.id);
+    save(); render(); return;
+  }
+  const gid = btn.closest('.group').dataset.g;
+  if (act === 'del-group') {
+    if (!confirm('删除该分组及其全部条目？')) return;
+    removeGroup(gid);
+  }
+  if (act === 'del-item') {
+    const iid = btn.closest('.item').dataset.id;
+    const g = findGroup(gid); if (!g) return;
+    g.items = g.items.filter(i => i.id !== iid);
+  }
+  save(); render();
+});
+
+// 状态循环
+$('#groups').addEventListener('click', e => {
+  const st = e.target.closest('.st'); if (!st) return;
+  const gid = st.closest('.group').dataset.g;
+  const iid = st.closest('.item').dataset.id;
+  const g = findGroup(gid); if (!g) return;
+  const it = g.items.find(i => i.id === iid); if (!it) return;
+  cycleStatus(it);
+  save(); render();
+});
+
+// 文本编辑（含周块标题）
+$('#groups').addEventListener('blur', e => {
+  if (e.target.classList.contains('wktitle')) {
+    const w = (D.archive || []).find(x => x.id === e.target.closest('.wk').dataset.w);
+    if (w) { w.title = e.target.innerText.trim(); save(); }
+    return;
+  }
+  const gid = e.target.closest('.group')?.dataset.g; if (!gid) return;
+  const g = findGroup(gid); if (!g) return;
+  if (e.target.classList.contains('gtitle')) g.title = e.target.innerText.trim();
+  if (e.target.classList.contains('gnote')) g.note = e.target.innerText.trim();
+  if (e.target.classList.contains('txt')) {
+    const it = g.items.find(i => i.id === e.target.closest('.item').dataset.id);
+    if (it) it.text = e.target.innerText.trim();
+  }
+  if (e.target.classList.contains('inote')) {
+    const it = g.items.find(i => i.id === e.target.closest('.item').dataset.id);
+    if (it) it.note = e.target.innerText.replace(/[\s\u00a0]+$/, '');
+  }
+  save();
+}, true);
+
+// 条目百分比 / 分组进度 / 优先级
+$('#groups').addEventListener('change', e => {
+  const t = e.target;
+  const gEl = t.closest('.group'); if (!gEl) return;
+  const g = findGroup(gEl.dataset.g); if (!g) return;
+  if (t.classList.contains('pct')) {
+    const it = g.items.find(i => i.id === t.closest('.item').dataset.id); if (!it) return;
+    const v = t.value.trim();
+    if (v === '') { delete it.pct; t.value = ''; }
+    else {
+      const num = Math.round(Number(v));
+      if (Number.isNaN(num)) { delete it.pct; t.value = ''; }
+      else { it.pct = Math.max(0, Math.min(100, num)); t.value = it.pct; }
+    }
+    save(); return;
+  }
+  if (t.classList.contains('gpct')) {
+    const v = t.value.trim();
+    if (v === '') { delete g.pct; t.value = ''; }
+    else {
+      const num = Math.round(Number(v));
+      if (Number.isNaN(num)) { delete g.pct; t.value = ''; }
+      else { g.pct = Math.max(0, Math.min(100, num)); t.value = g.pct; }
+    }
+    saveSoon(); return;
+  }
+  if (t.classList.contains('pri')) { g.pri = t.value; save(); render(); }
+});
+
+// 新增条目
+$('#groups').addEventListener('keydown', e => {
+  if (!e.target.classList.contains('add')) return;
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    const v = e.target.value.trim(); if (!v) return;
+    const g = findGroup(e.target.closest('.group').dataset.g); if (!g) return;
+    g.items.push({ id: uid(), text: v, s: 'todo', createdAt: nowIso() });
+    save(); render();
+    const ng = document.querySelector(`.group[data-g="${g.id}"] .add`);
+    if (ng) ng.focus();
+  }
+  if (e.key === 'Escape') e.target.blur();
+});
+
+/* ---- 当前任务面板 ---- */
+$('#currentCard').addEventListener('click', e => {
+  const chip = e.target.closest('.src-chip');
+  if (chip) { jumpTo(chip.dataset.tab, chip.dataset.wid, chip.dataset.iid); return; }
+
+  const st = e.target.closest('.st');
+  if (st) {
+    const hit = findItem(st.closest('.citem').dataset.id); if (!hit) return;
+    const done = cycleStatus(hit.i) === 'done';
+    save(); render();
+    if (done) toast('已销项，原任务同步完成，并已进日报');
+    return;
+  }
+
+  const btn = e.target.closest('[data-act]'); if (!btn) return;
+  if (btn.dataset.act === 'unpin') { togglePin(btn.closest('.citem').dataset.id); save(); render(); return; }
+  if (btn.dataset.act === 'clear-done') {
+    D.pins = D.pins.filter(id => { const h = findItem(id); return h && h.i.s !== 'done'; });
+    save(); render(); toast('已清理完成项'); return;
+  }
+  if (btn.dataset.act === 'add') addTempTask();
+});
+$('#currentCard').addEventListener('input', e => {
+  if (e.target.classList.contains('cadd-input')) cDraft = e.target.value;
+});
+$('#currentCard').addEventListener('change', e => {
+  if (e.target.classList.contains('cadd-group')) cGroup = e.target.value;
+});
+$('#currentCard').addEventListener('keydown', e => {
+  if (!e.target.classList.contains('cadd-input')) return;
+  if (e.key === 'Enter') { e.preventDefault(); addTempTask(); }
+  if (e.key === 'Escape') e.target.blur();
+});
+
+/* ---- 日报面板 / 企微推送 ---- */
+$('#dailyCard').addEventListener('click', async e => {
+  const btn = e.target.closest('[data-act]');
+  if (btn) {
+    const act = btn.dataset.act;
+    if (act === 'copy') {
+      const ds = dailyDate || todayStr();
+      const text = dailyOf(ds).text;
+      if (await copyText(text)) toast('日报已复制，粘贴到企微 / 邮件即可');
+      else {
+        const el = document.querySelector('#dailyCard .dtext');
+        if (el) {
+          const r = document.createRange(); r.selectNodeContents(el);
+          const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+        }
+        toast('浏览器拦截了自动复制，内容已选中，请按 ⌘C');
+      }
+      return;
+    }
+    if (act === 'regen') { regenDaily(); return; }
+    if (act === 'wh-save') {
+      saveWhFromUI();
+      const st = document.querySelector('#dailyCard .wh-status');
+      if (st) st.textContent = whStatusText(dailyDate || todayStr());
+      schedulePush();      // 配置变更后重新定时
+      toast(whCfg.url ? `已保存${pushChanLabel()}配置` : '已清空推送配置');
+      return;
+    }
+    if (act === 'push-test') { pushWecom('test'); return; }
+    if (act === 'push-now') { pushWecom('daily'); return; }
+    if (act === 'diag') { runDiag(); return; }
+  }
+  // 点标题行折叠 / 展开
+  if (e.target.closest('.day-head') && !e.target.closest('input, button')) {
+    D.dailyCollapsed = !D.dailyCollapsed; save(); render();
+  }
+});
+$('#dailyCard').addEventListener('change', e => {
+  const t = e.target;
+  if (t.classList.contains('dinput')) { dailyDate = t.value || todayStr(); render(); return; }
+  if (t.classList.contains('issue-input')) {
+    const ds = dailyDate || todayStr();
+    D.dailyIssues = D.dailyIssues || {};
+    const v = t.value.trim();
+    if (v) D.dailyIssues[ds] = v; else delete D.dailyIssues[ds];
+    save();
+    if (!dailyOf(ds).edited) render();    // 未手改时即时反映到简报文本
+    return;
+  }
+  if (t.classList.contains('wh-input') || t.classList.contains('wh-time') || t.classList.contains('wh-chan')) {
+    saveWhFromUI();
+    const st = document.querySelector('#dailyCard .wh-status');
+    if (st) st.textContent = whStatusText(dailyDate || todayStr());
+    schedulePush();      // 时间 / 密钥 / 通道变更后重新定时
+    if (t.classList.contains('wh-time')) toast('自动推送时间已改为 ' + whCfg.time);
+    if (t.classList.contains('wh-chan')) {
+      // 切通道后地址含义变了，重画一次以更新占位提示
+      const u = $('#dailyCard .wh-input');
+      if (u) u.placeholder = pushPlaceholder();
+      toast(`已切换到${pushChanLabel()}，请确认地址后点「保存」并「测试」`);
+    }
+  }
+});
+// 课题输入：回车即保存
+$('#dailyCard').addEventListener('keydown', e => {
+  if (e.target.classList.contains('issue-input') && e.key === 'Enter') { e.preventDefault(); e.target.blur(); }
+});
+// 日报正文手改：实时存回，并停止被自动生成覆盖
+$('#dailyCard').addEventListener('input', e => {
+  const host = e.target.closest ? e.target.closest('.dtext') : null;
+  if (!host) return;
+  setDailyText(dailyDate || todayStr(), host.innerText.replace(/[\s\u00a0]+$/, ''));
+  saveSoon();
+});
+
+/* ---- 拖拽排序（跨分组） ---- */
+let dragEl = null;
+$('#groups').addEventListener('dragstart', e => {
+  const li = e.target.closest('.item'); if (!li) return;
+  dragEl = li; li.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', li.dataset.id);
+});
+$('#groups').addEventListener('dragover', e => {
+  const li = e.target.closest('.item'); if (!li || !dragEl || li === dragEl) return;
+  e.preventDefault();
+  const r = li.getBoundingClientRect();
+  const after = e.clientY > r.top + r.height / 2;
+  li.classList.toggle('over-bottom', after);
+  li.classList.toggle('over-top', !after);
+});
+$('#groups').addEventListener('dragleave', e => {
+  const li = e.target.closest('.item'); if (li) li.classList.remove('over-top', 'over-bottom');
+});
+$('#groups').addEventListener('drop', e => {
+  const li = e.target.closest('.item'); if (!li || !dragEl) return;
+  e.preventDefault();
+  const r = li.getBoundingClientRect();
+  const after = e.clientY > r.top + r.height / 2;
+  const srcG = findGroup(dragEl.dataset.g);
+  const dstG = findGroup(li.dataset.g);
+  if (!srcG || !dstG) return;
+  const idx = srcG.items.findIndex(i => i.id === dragEl.dataset.id);
+  const [moved] = srcG.items.splice(idx, 1);
+  let di = dstG.items.findIndex(i => i.id === li.dataset.id);
+  dstG.items.splice(after ? di + 1 : di, 0, moved);
+  dragEl = null; save(); render();
+});
+$('#groups').addEventListener('dragend', () => {
+  document.querySelectorAll('.over-top,.over-bottom').forEach(x => x.classList.remove('over-top', 'over-bottom'));
+  if (dragEl) dragEl.classList.remove('dragging');
+  dragEl = null;
+});
+
+/* ========== 工具栏 ========== */
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('show'), 4200);
+}
+function stamp() { return new Date().toISOString().slice(0, 10); }
+
+$('#btnArchive').addEventListener('click', () => {
+  let n = 0;
+  let box = D.archive.find(a => a.title === D.weekLabel);
+  if (!box) { box = { id: uid(), title: D.weekLabel, collapsed: false, groups: [] }; D.archive.unshift(box); }
+  const moved = [];
+  D.week.forEach(g => {
+    const done = (g.items || []).filter(i => i.s === 'done');
+    if (!done.length) return;
+    // 保留本周的分组大标题，同名的合并到同一子分组
+    let sub = box.groups.find(x => x.title === g.title);
+    if (!sub) { sub = { id: uid(), title: g.title, pri: g.pri || 'none', note: '', items: [] }; box.groups.push(sub); }
+    done.forEach(d => { d.doneAt = d.doneAt || stamp(); sub.items.push(d); n++; moved.push(d.id); });
+    g.items = g.items.filter(i => i.s !== 'done');
+  });
+  // 归档即销项，同步从「当前任务」移除
+  if (moved.length) D.pins = (D.pins || []).filter(id => !moved.includes(id));
+  box.collapsed = false;
+  save(); render();
+  toast(n ? `已归档 ${n} 条完成项到「${D.weekLabel}」` : '本周暂无已完成项');
+});
+
+$('#btnRoll').addEventListener('click', () => {
+  if (!confirm('开始新的一周？\n未完成条目将保留在本周列表中，周期标签会自动推进一周。')) return;
+  const m = D.weekLabel.match(/(\d{4})-(\d{2})-(\d{2})\s*~\s*(\d{4})-(\d{2})-(\d{2})/);
+  if (m) {
+    const a = new Date(+m[1], +m[2] - 1, +m[3]);
+    a.setDate(a.getDate() + 7);
+    const b = new Date(a); b.setDate(b.getDate() + 6);
+    const f = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    D.weekLabel = `${f(a)} ~ ${f(b)}`;
+  }
+  D.archive.forEach(w => { w.collapsed = true; });
+  D.archive.unshift({ id: uid(), title: D.weekLabel, collapsed: false, groups: [] });
+  save(); render(); toast(`已滚动到 ${D.weekLabel}`);
+});
+
+$('#btnExpandAll').addEventListener('click', () => {
+  D.archive.forEach(w => { w.collapsed = false; }); save(); render();
+});
+$('#btnCollapseAll').addEventListener('click', () => {
+  D.archive.forEach(w => { w.collapsed = true; }); save(); render();
+});
+
+$('#btnMd').addEventListener('click', () => {
+  const L = [];
+  L.push('# 待办管理（彭俊铭）', '',
+    '> 按「当周 → 当月 → 当季」三层维护。**当周是工作台，当月/当季是目标盘**，每周滚动一次。',
+    `> 最近更新：${D.updatedAt}`, '', '---', '');
+  L.push('## 维护说明（每周 10 分钟）', '',
+    '| 动作 | 时机 | 做法 |', '|---|---|---|',
+    '| 打勾 | 随时 | 完成即把 `- [ ]` 改成 `- [x]` |',
+    '| 新增 | 随时 | 写进「本周待办」；排不下则放「待办池」 |',
+    '| 周滚动 | 每周一 | 本周已完成项归入「周归档」，从待办池/本月补新任务 |',
+    '| 月/季复盘 | 月末、季末 | 更新目标进度，未完成的滚动到下一周期并写明原因 |', '',
+    '**状态**：`[ ]` 未开始 ｜ `[x]` 已完成 ｜ `[~]` 进行中 ｜ `[!]` 阻塞/需他人推动',
+    '**优先级**：`P0` 本周必须完成 ｜ `P1` 本周推进 ｜ `P2` 有空再做', '', '---', '');
+
+  const mark = s => ({ todo: '[ ]', doing: '[~]', block: '[!]', done: '[x]' }[s] || '[ ]');
+  const sec = (title, key, extraLabel) => {
+    L.push(`## ${title}`, '');
+    if (extraLabel) L.push(`> 周期：${extraLabel}`, '');
+    (D[key] || []).forEach((g, gi) => {
+      const p = g.pri && g.pri !== 'none' ? ` \`${g.pri}\`` : '';
+      L.push(`### ${gi + 1}. ${g.title}${p}`, '');
+      if (g.note) L.push(`> ${g.note}`, '');
+      (g.items || []).forEach(i => {
+        const tag = i.s === 'done' && i.doneAt ? `（${i.doneAt} 完成）` : '';
+        L.push(`- ${mark(i.s)} ${i.text}${tag}`);
+      });
+      L.push('');
+    });
+  };
+  sec('一、本周待办', 'week', D.weekLabel);
+  sec('二、当月目标', 'month', D.monthLabel);
+  sec('三、当季目标', 'quarter', D.quarterLabel);
+  sec('四、待办池（暂未排期）', 'pool');
+
+  L.push('## 五、周归档（历史完成记录）', '');
+  (D.archive || []).forEach(w => {
+    const gs = w.groups || [];
+    const cnt = gs.reduce((n, g) => n + (g.items || []).length, 0);
+    L.push(`### ${w.title}（${cnt} 项）`, '');
+    if (!gs.length) { L.push('- （本周无归档）', ''); return; }
+    gs.forEach(g => {
+      const p = g.pri && g.pri !== 'none' ? ` \`${g.pri}\`` : '';
+      L.push(`#### ${g.title}${p}`, '');
+      (g.items || []).forEach(i => {
+        const tag = i.s === 'done' && i.doneAt ? `（${i.doneAt} 完成）` : '';
+        L.push(`- ${mark(i.s)} ${i.text}${tag}`);
+      });
+      L.push('');
+    });
+  });
+
+  download('待办管理.md', L.join('\n'), 'text/markdown');
+  toast('已导出 待办管理.md');
+});
+
+$('#btnExport').addEventListener('click', () => {
+  download(`待办管理备份-${D.updatedAt}.json`, JSON.stringify(D, null, 2), 'application/json');
+  toast('已导出备份 JSON');
+});
+$('#btnImport').addEventListener('click', () => $('#fileInput').click());
+$('#fileInput').addEventListener('change', e => {
+  const f = e.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      const obj = JSON.parse(r.result);
+      if (!obj.week) throw new Error('格式不符');
+      if (confirm('导入将覆盖当前数据，确定继续？')) { D = migrate(obj); save(); render(); toast('导入成功'); }
+    } catch (err) { alert('导入失败：' + err.message); }
+  };
+  r.readAsText(f); e.target.value = '';
+});
+
+/* ========== 模糊搜索（跨全部视图，含周归档） ========== */
+// 收集所有条目，附带来源（视图 / 周标签 / 分组大标题），供搜索与跳转定位
+function collectAll() {
+  const out = [];
+  const add = (tab, wid, src, sub, g, i) =>
+    out.push({ tab, wid, src, sub, iid: i.id, text: i.text || '', s: i.s, doneAt: i.doneAt });
+  [['week', '本周待办', D.weekLabel], ['month', '当月目标', D.monthLabel],
+   ['quarter', '当季目标', D.quarterLabel], ['pool', '待办池', '']]
+    .forEach(([k, n, label]) => (D[k] || []).forEach(g =>
+      (g.items || []).forEach(i => add(k, '', `${n}${label ? ' · ' + label : ''}`, g.title, g, i))));
+  (D.archive || []).forEach(w => (w.groups || []).forEach(g =>
+    (g.items || []).forEach(i => add('archive', w.id, `周归档 · ${w.title}`, g.title, g, i))));
+  return out;
+}
+
+// 单个关键词：优先整串命中，其次按字符顺序的子序列（模糊）命中
+function matchTerm(text, term) {
+  const t = String(text || '');
+  const low = t.toLowerCase(), s = term.toLowerCase();
+  if (!s) return { score: 0, ranges: [] };
+  const idx = low.indexOf(s);
+  if (idx >= 0) return { score: 1000 - idx, ranges: [[idx, idx + s.length]] };
+  let i = 0, rs = [], prev = -2;
+  for (let j = 0; j < t.length && i < s.length; j++) {
+    if (low[j] === s[i]) {
+      if (j === prev + 1) rs[rs.length - 1][1] = j + 1; else rs.push([j, j + 1]);
+      prev = j; i++;
+    }
+  }
+  if (i < s.length) return null;
+  const span = rs[rs.length - 1][0] - rs[0][0];
+  return { score: Math.max(1, 400 - rs[0][0] - span), ranges: rs };
+}
+
+function highlight(text, ranges) {
+  const rs = (ranges || []).slice().sort((a, b) => a[0] - b[0]);
+  if (!rs.length) return esc(text);
+  let out = '', pos = 0;
+  rs.forEach(([a, b]) => {
+    if (b <= pos) return;
+    const s = Math.max(a, pos);
+    out += esc(text.slice(pos, s)) + '<mark>' + esc(text.slice(s, b)) + '</mark>';
+    pos = b;
+  });
+  return out + esc(text.slice(pos));
+}
+
+// 多个关键词需全部命中；返回累计得分与命中区间
+function matchAll(text, terms) {
+  let score = 0, ranges = [];
+  for (const t of terms) {
+    const m = matchTerm(text, t);
+    if (!m) return null;
+    score += m.score; ranges = ranges.concat(m.ranges);
+  }
+  return { score, ranges };
+}
+
+function searchHTML(q) {
+  const terms = q.split(/\s+/).filter(Boolean);
+  const hits = [];
+  collectAll().forEach(r => {
+    let m = matchAll(r.text, terms);
+    let score, ranges;
+    if (m) { score = m.score; ranges = m.ranges; }
+    else {
+      // 正文没命中时，退一步匹配「分组大标题 / 周标签」，便于按类别检索
+      const m2 = matchAll(`${r.sub} ${r.src}`, terms);
+      if (!m2) return;
+      score = m2.score - 100000; ranges = [];
+    }
+    hits.push(Object.assign({}, r, { score, ranges }));
+  });
+  hits.sort((a, b) => b.score - a.score);
+
+  const inArch = hits.filter(h => h.tab === 'archive').length;
+  const head = `<div class="sec-label">匹配 ${hits.length} 条（其中归档 ${inArch} 条）· 点击结果跳转到原位置</div>`;
+  if (!hits.length) {
+    return head + `<div class="empty">没有匹配「${esc(q)}」的任务</div>`;
+  }
+  return head + hits.map(h => `
+    <div class="res" data-tab="${h.tab}" data-wid="${h.wid}" data-iid="${h.iid}">
+      <div class="res-meta">${esc(h.src)} · ${esc(h.sub)}</div>
+      <div class="res-item" data-s="${h.s}">
+        <span class="st" data-s="${h.s}" title="点击切换状态"></span>
+        <div class="txt">${highlight(h.text, h.ranges)}</div>
+      </div>
+    </div>`).join('');
+}
+
+$('#searchInput').addEventListener('input', e => { searchQ = e.target.value; render(); });
+$('#searchInput').addEventListener('keydown', e => {
+  if (e.key === 'Escape') { searchQ = ''; e.target.value = ''; render(); e.target.blur(); }
+});
+$('#btnClearSearch').addEventListener('click', () => {
+  searchQ = ''; $('#searchInput').value = ''; render();
+});
+
+$('#results').addEventListener('click', e => {
+  const row = e.target.closest('.res'); if (!row) return;
+  const iid = row.dataset.iid;
+  // 点状态点：直接切状态
+  if (e.target.closest('.st')) {
+    const hit = findItem(iid); if (!hit) return;
+    cycleStatus(hit.i);
+    save(); render(); return;
+  }
+  // 点结果行：跳到原视图并高亮
+  if (row.dataset.wid) {
+    const w = (D.archive || []).find(x => x.id === row.dataset.wid);
+    if (w) { w.collapsed = false; save(); }
+  }
+  D.active = row.dataset.tab;
+  searchQ = ''; $('#searchInput').value = '';
+  save(); render();
+  const el = document.querySelector(`.item[data-id="${iid}"]`);
+  if (el) {
+    el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    el.classList.add('flash');
+    setTimeout(() => el.classList.remove('flash'), 1600);
+  }
+});
+
+function download(name, content, type) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([content], { type: type + ';charset=utf-8' }));
+  a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+window.addEventListener('beforeunload', () => localStorage.setItem(KEY, JSON.stringify(D)));
+render();
+schedulePush();   // 精确定时：只在推送时刻醒来一次，不做空转轮询
+// 启动即自检运行环境：file:// 页面在多数浏览器里读不到推送回执（Safari 连发送都会拦），
+// 与其等到 17:20 才发现推不出去，不如一打开就说明清楚、并给出更省心的做法。
+(function envWarn() {
+  if (/^file:$/.test(location.protocol)) {
+    const safari = /Safari\//.test(navigator.userAgent) && !/Chrome|Chromium|Edg\//.test(navigator.userAgent);
+    pushLog('环境 · 本页以 file:// 打开：推送会自动走「隐藏表单」发送（能发出，但读不到服务端回执）'
+      + (safari ? '；Safari 还会拦掉 fetch 校验' : '')
+      + '。想要"服务端已确认"的真实结果，把本文件放到 https 访问（如 GitHub Pages）即可', false);
+    localStorage.setItem(WH_KEY, JSON.stringify(whCfg));
+    render();
+  }
+})();
+</script>
+</body>
+</html>
