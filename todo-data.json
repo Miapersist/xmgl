@@ -4,7 +4,9 @@
   "monthLabel": "2026 年 9 月",
   "quarterLabel": "2026 Q3（7 ~ 9 月）",
   "active": "week",
-  "pins": [],
+  "pins": [
+    "h0s0f3n"
+  ],
   "dailies": {},
   "dailyIssues": {},
   "pushed": {
@@ -95,10 +97,18 @@
     },
     {
       "id": "abjkiod",
-      "title": "新分组",
+      "title": "test",
       "pri": "P1",
       "note": "",
-      "items": []
+      "items": [
+        {
+          "id": "h0s0f3n",
+          "text": "te s t",
+          "s": "block",
+          "createdAt": "2026-10-03T23:41",
+          "pct": 100
+        }
+      ]
     }
   ],
   "month": [
@@ -225,5 +235,5 @@
       "groups": []
     }
   ],
-  "ut": 1791042077648
+  "ut": 1791042098875
 }
