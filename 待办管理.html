@@ -496,7 +496,7 @@ function scheduleGhPush() {
   clearTimeout(ghPushTimer);
   ghPushTimer = setTimeout(() => ghPush(true), 3000);
 }
-async function ghPull(silent) {
+async function ghPull(silent, force) {
   if (!ghReady()) { if (!silent) toast('先填好云同步配置'); return false; }
   ghState('拉取中…');
   try {
@@ -508,21 +508,27 @@ async function ghPull(silent) {
     const j = await r.json();
     gh.sha = j.sha; saveGh();
     const remote = JSON.parse(b64dec(j.content));
-    if (Number(remote.ut || 0) > Number(D.ut || 0)) {
-      ghPulling = true;
-      try {
-        D = migrate(remote);
-        localStorage.setItem(KEY, JSON.stringify(D));
-        render();
-      } finally { ghPulling = false; }
-      gh.lastSync = Date.now(); saveGh();
-      ghState('已同步云端 ' + new Date().toTimeString().slice(0, 5));
-      if (!silent) toast('已取到云端最新数据');
-      return true;
+    // 手动「从云端拉取」传 force=true：无视版本戳，直接用云端覆盖本地；
+    // 自动同步（force 为空）仍按版本戳，避免无谓覆盖。
+    const overwrite = force || Number(remote.ut || 0) > Number(D.ut || 0);
+    if (!overwrite) {
+      ghState('本地已是最新');
+      if (!silent) toast('云端不比本地新，保留本地');
+      return false;
     }
-    ghState('本地已是最新');
-    if (!silent) toast('云端不比本地新，保留本地');
-    return false;
+    if (force && !silent && !confirm('将用云端数据覆盖本地（含尚未回推的改动），确定？')) {
+      ghState('已取消拉取'); return false;
+    }
+    ghPulling = true;
+    try {
+      D = migrate(remote);
+      localStorage.setItem(KEY, JSON.stringify(D));
+      render();
+    } finally { ghPulling = false; }
+    gh.lastSync = Date.now(); saveGh();
+    ghState('已同步云端 ' + new Date().toTimeString().slice(0, 5));
+    if (!silent) toast('已用云端数据覆盖本地');
+    return true;
   } catch (e) {
     ghState('拉取失败');
     if (!silent) toast('拉取失败：' + ((e && e.message) || e));
@@ -600,7 +606,7 @@ $('#ghSave').addEventListener('click', () => {
   ghPull(true).then(ok => { if (!ok && !gh.sha) ghPush(true); });
 });
 $('#ghTest').addEventListener('click', ghTest);
-$('#ghPullBtn').addEventListener('click', () => ghPull(false));
+$('#ghPullBtn').addEventListener('click', () => ghPull(false, true));
 $('#ghPushBtn').addEventListener('click', () => ghPush(false));
 // 页面重新可见时悄悄对一次；隐藏时把最后改动推上去
 document.addEventListener('visibilitychange', () => {
@@ -1111,7 +1117,7 @@ function renderDaily() {
     <input class="issue-input" placeholder="今天要上报的课题 / 协调事项，留空 = 暂无…" value="${esc(issue)}">
   </div>
   <div class="day-foot">
-    <span class="cur-hint">日报推送<sup style="opacity:.45;font-size:10px" title="代码版本，用于确认浏览器已加载最新文件">v12</sup></span>
+    <span class="cur-hint">日报推送<sup style="opacity:.45;font-size:10px" title="代码版本，用于确认浏览器已加载最新文件">v13</sup></span>
     <select class="wh-chan" title="推送通道（粘贴 Bark / ntfy 地址会自动切换）">
       <option value="wecom"${effChan() === 'wecom' ? ' selected' : ''}>企微机器人</option>
       <option value="bark"${effChan() === 'bark' ? ' selected' : ''}>Bark 手机推送（仅 iOS）</option>
