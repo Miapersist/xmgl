@@ -324,6 +324,18 @@
   .meter:hover{color:var(--text2); background:#fff;}
   .day-card.collapsed .dtext,.day-card.collapsed .day-foot,.day-card.collapsed .issue-row{display:none;}
 
+  /* 云同步面板（数据存到 GitHub 仓库，多端打开即取最新） */
+  .gh-panel{margin:8px 0 0; border:1px solid var(--line); border-radius:10px; background:#fff;}
+  .gh-panel>summary{cursor:pointer; padding:7px 10px; font-size:12.5px; color:var(--text2); user-select:none;}
+  .gh-panel>summary .cur-hint{margin-left:6px;}
+  .gh-grid{display:flex; flex-wrap:wrap; gap:8px 12px; padding:2px 10px 6px;}
+  .gh-grid label{display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--text2);}
+  .gh-grid input{border:1px solid var(--line); border-radius:8px; padding:5px 8px; font:inherit; font-size:12.5px; min-width:150px;}
+  .gh-grid input:focus{outline:none; border-color:var(--primary);}
+  .gh-acts{display:flex; gap:8px; flex-wrap:wrap; padding:0 10px 8px;}
+  .gh-tip{margin:0 10px 10px; font-size:12px; color:var(--text3); line-height:1.75;}
+  .gh-tip b{color:var(--p0);}
+
   @media print{
     .toolbar,.tabs,.icon-btn,.drag,.add,.ghead select,.updated input,.searchbar,.arch-bar,.cadd,.day-foot{display:none;}
     .wk.collapsed .wkbody{display:block;}
@@ -386,7 +398,7 @@
       <tr><td>当前任务</td><td>随时</td><td>任务行点 ☆ 置顶到页面顶部「当前任务」；也可在此直接建临时任务并选一个关联大标题，销项与原任务同步</td></tr>
       <tr><td>日报</td><td>随时 / 下班前</td><td>按「当天完成 + 所有进行中」自动生成工作简报：大标题即项目名分组、编号 1、2、3、每条带完成百分比与备注行、结尾「课题/协调事项」；可直接改，「一键复制」粘贴到企微或邮件</td></tr>
       <tr><td>百分比 / 备注</td><td>随时</td><td>条目行右侧填完成百分比（填了才带进日报，不自动补）、条目下方写备注行（带进日报）；大标题右侧填项目进度百分比（手动、仅工具内查看，不进日报）</td></tr>
-      <tr><td>日报推送</td><td>每天 17:20</td><td>日报区可选通道：<b>Bark 手机推送</b>（填设备 Key，iPhone 装 Bark 后自取，<b>能返回真实成败</b>）或 <b>企微群机器人</b>（填 Webhook Key，跨域受限只能盲发）。保存后到点自动把当日日报发出去，<b>需保持本页处于打开状态</b>；每次推送会在配置行下方留一条记录</td></tr>
+      <tr><td>日报推送</td><td>每天 17:20</td><td>日报区可选通道：<b>ntfy 手机推送</b>（安卓 / iPhone 均可：装 ntfy 后订阅一个主题名，此处填该主题名，<b>能返回真实成败</b>）、<b>Bark 手机推送</b>（填设备 Key，<b>仅 iOS</b>）或 <b>企微群机器人</b>（填 Webhook Key，跨域受限只能盲发）。保存后到点自动把当日日报发出去，<b>需保持本页处于打开状态</b>；每次推送会在配置行下方留一条记录</td></tr>
       <tr><td>数据体检</td><td>需要时</td><td>点页头「数据 xx KB」看占用与明细：日报是按完成时间即时生成的派生数据，只有手改过的日子才占用空间；推送记录超过 90 天自动丢弃，任务与归档不会被自动删</td></tr>
       <tr><td>同步 md</td><td>需要时</td><td>点「导出 Markdown」下载，覆盖 <code>项目管理/待办管理.md</code></td></tr>
     </table>
@@ -407,6 +419,28 @@
   <button class="btn" id="btnImport">导入备份</button>
   <input type="file" id="fileInput" accept=".json" class="hide">
 </div>
+
+<details class="gh-panel" id="ghPanel">
+  <summary>云同步（GitHub）<span class="cur-hint" id="ghState">未配置</span></summary>
+  <div class="gh-grid">
+    <label>Token<input id="ghToken" type="password" autocomplete="off" spellcheck="false" placeholder="github_pat_… 或 ghp_…"></label>
+    <label>用户名<input id="ghOwner" spellcheck="false" placeholder="GitHub 用户名"></label>
+    <label>仓库<input id="ghRepo" spellcheck="false" placeholder="仓库名"></label>
+    <label>分支<input id="ghBranch" spellcheck="false" placeholder="main"></label>
+    <label>数据文件<input id="ghPath" spellcheck="false" placeholder="todo-data.json"></label>
+  </div>
+  <div class="gh-acts">
+    <button class="btn primary" id="ghSave">保存配置</button>
+    <button class="btn" id="ghTest">测试连接</button>
+    <button class="btn" id="ghPullBtn">从云端拉取</button>
+    <button class="btn" id="ghPushBtn">立即推送</button>
+  </div>
+  <p class="gh-tip">
+    数据同时存在本机 localStorage 与仓库里的这个 JSON 文件：打开页面自动取云端较新的一份，改动后约 3 秒自动回推。换任何设备/浏览器打开同一页面，填一次配置即可看到同一份数据。<br>
+    配置只存在本机浏览器，不会写进仓库。<b>Token 属于高权限凭据</b>：用 fine-grained token 并把权限限制为「仅该仓库 + Contents: Read and write」，泄漏后请立即到 GitHub 撤销。<br>
+    同一时刻多端同时编辑会以「最后推送的一方」为准；重要改动前先点「从云端拉取」或先导出备份。
+  </p>
+</details>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -414,6 +448,163 @@ const KEY = 'gpm-todo-v1';
 const uid = () => Math.random().toString(36).slice(2, 9);
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ========== 云同步（GitHub Contents API）：数据同时存本机与仓库 JSON，多端打开取最新 ==========
+   与本地 self_review 页面同一范式：localStorage 为准，仓库里的 JSON 文件做跨端载体。
+   拉取：仅当云端版本时间戳（ut）更大时覆盖本地；推送：带 sha 乐观锁，冲突先拉再推。
+   注意：Token 只存在本机 localStorage，不写进仓库；同一时刻多端编辑以最后推送方为准。 */
+const GH_KEY = 'gpm-todo-gh';
+function defaultGh() {
+  // 从地址推断用户名与仓库，省一次手填：https://<user>.github.io/<repo>/xxx.html
+  const m = /^([^.]+)\.github\.io$/i.exec(location.hostname || '');
+  const seg = (location.pathname.split('/').filter(Boolean)[0] || '').replace(/\.[a-z]+$/i, '');
+  return { owner: m ? m[1] : '', repo: seg || '', branch: 'main', path: 'todo-data.json', token: '', sha: '', lastSync: 0 };
+}
+function loadGh() {
+  try { return Object.assign(defaultGh(), JSON.parse(localStorage.getItem(GH_KEY)) || {}); }
+  catch (e) { return defaultGh(); }
+}
+let gh = loadGh();
+function saveGh() {
+  localStorage.setItem(GH_KEY, JSON.stringify({
+    owner: gh.owner, repo: gh.repo, branch: gh.branch, path: gh.path,
+    token: gh.token, sha: gh.sha, lastSync: gh.lastSync
+  }));
+}
+function ghReady() { return !!(gh.token && gh.owner && gh.repo && gh.path); }
+function ghApiUrl() {
+  return 'https://api.github.com/repos/' + encodeURIComponent(gh.owner) + '/' + encodeURIComponent(gh.repo)
+    + '/contents/' + String(gh.path).split('/').map(encodeURIComponent).join('/');
+}
+function ghHeaders() {
+  return { 'Authorization': 'token ' + gh.token, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' };
+}
+function b64enc(str) {
+  const b = new TextEncoder().encode(str); let s = '';
+  for (let i = 0; i < b.length; i++) s += String.fromCharCode(b[i]);
+  return btoa(s);
+}
+function b64dec(str) {
+  const s = atob(String(str).replace(/\s/g, '')); const b = new Uint8Array(s.length);
+  for (let i = 0; i < s.length; i++) b[i] = s.charCodeAt(i);
+  return new TextDecoder().decode(b);
+}
+function ghState(txt) { const el = $('#ghState'); if (el) el.textContent = txt; }
+let ghPulling = false, ghPushTimer = null;
+/* 本地改动后延迟回推，合并连续编辑（避免每个字都生成一次 commit） */
+function scheduleGhPush() {
+  if (!ghReady() || ghPulling) return;
+  clearTimeout(ghPushTimer);
+  ghPushTimer = setTimeout(() => ghPush(true), 3000);
+}
+async function ghPull(silent) {
+  if (!ghReady()) { if (!silent) toast('先填好云同步配置'); return false; }
+  ghState('拉取中…');
+  try {
+    const r = await fetch(ghApiUrl() + '?ref=' + encodeURIComponent(gh.branch || 'main') + '&t=' + Date.now(),
+      { headers: ghHeaders(), cache: 'no-store' });
+    if (r.status === 404) { gh.sha = ''; saveGh(); ghState('云端暂无数据文件'); if (!silent) toast('云端还没有数据文件，点「立即推送」创建'); return false; }
+    if (r.status === 401 || r.status === 403) { ghState('Token 无效或无权限'); if (!silent) toast('GitHub 拒绝：检查 Token 是否有效、是否有该仓库 Contents 读写权限'); return false; }
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const j = await r.json();
+    gh.sha = j.sha; saveGh();
+    const remote = JSON.parse(b64dec(j.content));
+    if (Number(remote.ut || 0) > Number(D.ut || 0)) {
+      ghPulling = true;
+      try {
+        D = migrate(remote);
+        localStorage.setItem(KEY, JSON.stringify(D));
+        render();
+      } finally { ghPulling = false; }
+      gh.lastSync = Date.now(); saveGh();
+      ghState('已同步云端 ' + new Date().toTimeString().slice(0, 5));
+      if (!silent) toast('已取到云端最新数据');
+      return true;
+    }
+    ghState('本地已是最新');
+    if (!silent) toast('云端不比本地新，保留本地');
+    return false;
+  } catch (e) {
+    ghState('拉取失败');
+    if (!silent) toast('拉取失败：' + ((e && e.message) || e));
+    return false;
+  }
+}
+async function ghPush(silent, retried) {
+  if (!ghReady() || ghPulling) return false;
+  clearTimeout(saveTimer); saveTimer = null;      // 把还在防抖里的改动一并落盘后再推
+  D.ut = Date.now();
+  try { localStorage.setItem(KEY, JSON.stringify(D)); } catch (e) { /* 忽略 */ }
+  ghState('推送中…');
+  const body = {
+    message: 'todo: ' + new Date().toISOString().slice(0, 16).replace('T', ' ') + ' 更新',
+    content: b64enc(JSON.stringify(D, null, 2)),
+    branch: gh.branch || 'main'
+  };
+  if (gh.sha) body.sha = gh.sha;
+  try {
+    const r = await fetch(ghApiUrl(), { method: 'PUT', headers: ghHeaders(), body: JSON.stringify(body) });
+    if ((r.status === 409 || r.status === 422) && !retried) {   // 云端已被别处更新 → 先拉再推一次
+      await ghPull(true);
+      return ghPush(silent, true);
+    }
+    if (!r.ok) {
+      const txt = await r.text().catch(() => '');
+      throw new Error('HTTP ' + r.status + (txt ? ' ' + txt.slice(0, 140) : ''));
+    }
+    const j = await r.json();
+    gh.sha = (j.content && j.content.sha) || gh.sha;
+    gh.lastSync = Date.now(); saveGh();
+    ghState('已同步 ' + new Date().toTimeString().slice(0, 5));
+    if (!silent) toast('已推送到云端');
+    return true;
+  } catch (e) {
+    ghState('推送失败');
+    if (!silent) toast('推送失败：' + ((e && e.message) || e));
+    return false;
+  }
+}
+async function ghTest() {
+  readGhFromUI();
+  if (!ghReady()) { toast('先填 Token、用户名、仓库、数据文件路径'); return; }
+  ghState('测试中…');
+  try {
+    const r = await fetch(ghApiUrl() + '?ref=' + encodeURIComponent(gh.branch || 'main') + '&t=' + Date.now(),
+      { headers: ghHeaders(), cache: 'no-store' });
+    if (r.status === 404) { ghState('连接正常 · 云端无数据文件'); toast('连接正常，云端还没有数据文件，点「立即推送」会创建'); return; }
+    if (r.status === 401 || r.status === 403) { ghState('Token 无效或无权限'); toast('GitHub 拒绝：Token 无效，或缺该仓库 Contents 读写权限'); return; }
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const j = await r.json();
+    gh.sha = j.sha; saveGh();
+    ghState('连接正常 · 云端有数据');
+    toast('连接正常，云端已有数据');
+  } catch (e) { ghState('连接失败'); toast('连不上：' + ((e && e.message) || e)); }
+}
+function readGhFromUI() {
+  const val = id => { const el = $('#' + id); return el ? el.value.trim() : ''; };
+  gh.owner = val('ghOwner'); gh.repo = val('ghRepo');
+  gh.branch = val('ghBranch') || 'main'; gh.path = val('ghPath');
+  const tk = val('ghToken'); if (tk) gh.token = tk;   // 留空表示不改动已存 Token
+  saveGh();
+}
+function fillGhUI() {
+  const set = (id, v) => { const el = $('#' + id); if (el) el.value = v || ''; };
+  set('ghOwner', gh.owner); set('ghRepo', gh.repo); set('ghBranch', gh.branch || 'main');
+  set('ghPath', gh.path); set('ghToken', gh.token);
+}
+$('#ghSave').addEventListener('click', () => {
+  readGhFromUI();
+  toast(ghReady() ? '云同步配置已保存' : '还缺：Token / 用户名 / 仓库 / 数据文件');
+  ghState(ghReady() ? '已配置' : '未配置');
+});
+$('#ghTest').addEventListener('click', ghTest);
+$('#ghPullBtn').addEventListener('click', () => ghPull(false));
+$('#ghPushBtn').addEventListener('click', () => ghPush(false));
+// 页面重新可见时悄悄对一次；隐藏时把最后改动推上去
+document.addEventListener('visibilitychange', () => {
+  if (!ghReady()) return;
+  if (document.hidden) ghPush(true); else ghPull(true);
+});
 
 /* ========== 初始数据 ========== */
 const DEFAULT = () => ({
@@ -531,6 +722,7 @@ let saveTimer = null;
 function save() {
   clearTimeout(saveTimer); saveTimer = null;
   D.updatedAt = new Date().toISOString().slice(0, 10);
+  D.ut = Date.now();                    // 数据版本时间戳：云同步据此判断哪一端更新
   try {
     localStorage.setItem(KEY, JSON.stringify(D));
   } catch (e) {
@@ -538,6 +730,7 @@ function save() {
       '\n建议先「导出备份 JSON」，再点顶部「数据 xx KB」清理历史缓存 / 删除旧归档周块。');
   }
   $('#updatedAt').value = D.updatedAt;
+  scheduleGhPush();                     // 本地改动 → 稍后自动回推云端
 }
 // 连续输入场景：合并写入，避免每敲一个字就整包序列化
 function saveSoon() {
@@ -705,21 +898,27 @@ function loadWh() {
     return c;
   } catch (e) { return { chan: 'wecom', log: [] }; }
 }
-/* 统一返回实际推送地址（存在性判断用）；Bark 允许只贴设备 Key，自动补全 */
+/* 统一返回实际推送地址（存在性判断用）；Bark 允许只贴设备 Key、ntfy 允许只贴主题名，自动补全 */
 function whUrl() {
   const v = (whCfg.url || '').trim();
   if (!v) return '';
-  if (effChan() !== 'bark') {
-    return /^https?:\/\//i.test(v) ? v : `https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=${encodeURIComponent(v)}`;
+  const ch = effChan();
+  if (ch === 'bark') {
+    const t = barkTarget();
+    return t && t.deviceKey ? 'https://' + t.host + '/' + t.deviceKey : '';
   }
-  const t = barkTarget();
-  return t && t.deviceKey ? 'https://' + t.host + '/' + t.deviceKey : '';
+  if (ch === 'ntfy') {
+    const t = ntfyTarget();
+    return t && t.topic ? 'https://' + t.host + '/' + t.topic : '';
+  }
+  return /^https?:\/\//i.test(v) ? v : `https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=${encodeURIComponent(v)}`;
 }
-/* 通道自动识别：地址里只要出现 api.day.app，就按 Bark 处理（不依赖下拉是否正确） */
+/* 通道自动识别：地址里出现 api.day.app 按 Bark、出现 ntfy 按 ntfy（不依赖下拉是否正确） */
 function effChan() {
   const v = (whCfg.url || '').trim();
   if (/api\.day\.app/i.test(v)) return 'bark';
-  return whCfg.chan === 'bark' ? 'bark' : 'wecom';
+  if (/ntfy/i.test(v)) return 'ntfy';
+  return whCfg.chan === 'bark' ? 'bark' : whCfg.chan === 'ntfy' ? 'ntfy' : 'wecom';
 }
 /* 从任意文本里抓设备 Key：容忍把整条 curl 命令、完整推送链接、点连接整段粘进来 */
 function extractBarkKey(text) {
@@ -759,13 +958,30 @@ function barkTarget() {
   }
   return { host: host, deviceKey: segs[1] || '' };     // ④ 自建服务器
 }
+/* 解析 ntfy 目标（安卓 / iPhone 都可用，不依赖 Apple 推送）。兼容：
+   ① 仅主题名              todo-x7k2q9
+   ② 完整地址              https://ntfy.sh/todo-x7k2q9
+   ③ 自建服务器            https://ntfy.example.com/todo-x7k2q9
+   返回 {host, topic}，发送时 POST https://<host>/（JSON 发布，中文与多行正文均可） */
+function ntfyTarget() {
+  const v = (whCfg.url || '').trim();
+  if (!v) return null;
+  if (!/^https?:\/\//i.test(v)) return { host: 'ntfy.sh', topic: v.replace(/^\/+|\/+$/g, '') };
+  const m = /^https?:\/\/([^/?#]+)\/*([^/?#]*)/i.exec(v);
+  if (!m) return null;
+  return { host: m[1], topic: (m[2] || '').replace(/\/+$/, '') };
+}
 /* 占位文案与通道名：跟随实际生效通道（含 URL 自动识别） */
 function pushPlaceholder() {
-  return effChan() === 'bark'
-    ? '粘贴 Bark 设备 Key 或 https://api.day.app/xxxx，留空则只本地保存日报'
-    : '粘贴 Webhook Key（或完整地址），留空则只本地保存日报';
+  const ch = effChan();
+  if (ch === 'bark') return '粘贴 Bark 设备 Key 或 https://api.day.app/xxxx，留空则只本地保存日报';
+  if (ch === 'ntfy') return '粘贴 ntfy 主题名（如 todo-x7k2q9）或完整地址，留空则只本地保存日报';
+  return '粘贴 Webhook Key（或完整地址），留空则只本地保存日报';
 }
-function pushChanLabel() { return effChan() === 'bark' ? 'Bark 手机推送' : '企微机器人'; }
+function pushChanLabel() {
+  const ch = effChan();
+  return ch === 'bark' ? 'Bark 手机推送' : ch === 'ntfy' ? 'ntfy 手机推送' : '企微机器人';
+}
 function saveWhFromUI() {
   const box = $('#dailyCard'); if (!box) return;
   const u = box.querySelector('.wh-input'), t = box.querySelector('.wh-time'), c = box.querySelector('.wh-chan');
@@ -893,10 +1109,11 @@ function renderDaily() {
     <input class="issue-input" placeholder="今天要上报的课题 / 协调事项，留空 = 暂无…" value="${esc(issue)}">
   </div>
   <div class="day-foot">
-    <span class="cur-hint">日报推送<sup style="opacity:.45;font-size:10px" title="代码版本，用于确认浏览器已加载最新文件">v9</sup></span>
-    <select class="wh-chan" title="推送通道（粘贴 Bark 地址会自动切到 Bark）">
+    <span class="cur-hint">日报推送<sup style="opacity:.45;font-size:10px" title="代码版本，用于确认浏览器已加载最新文件">v11</sup></span>
+    <select class="wh-chan" title="推送通道（粘贴 Bark / ntfy 地址会自动切换）">
       <option value="wecom"${effChan() === 'wecom' ? ' selected' : ''}>企微机器人</option>
-      <option value="bark"${effChan() === 'bark' ? ' selected' : ''}>Bark 手机推送</option>
+      <option value="bark"${effChan() === 'bark' ? ' selected' : ''}>Bark 手机推送（仅 iOS）</option>
+      <option value="ntfy"${effChan() === 'ntfy' ? ' selected' : ''}>ntfy 手机推送（安卓 / iPhone）</option>
     </select>
     <input class="wh-input" type="password" autocomplete="off" placeholder="${esc(pushPlaceholder())}" value="${esc(whCfg.url || '')}">
     <input class="wh-time" type="time" value="${whCfg.time || '17:20'}" title="每天自动推送时间">
@@ -1022,6 +1239,32 @@ async function sendWecom(url, content) {
     return { ok: false, msg: '三种方式都没发出去（' + e1 + '）', via: '全部失败' };
   }
 
+  if (effChan() === 'ntfy') {
+    const t = ntfyTarget();
+    if (!t || !t.topic) return { ok: false, msg: '没能识别出 ntfy 主题名（topic）', via: '解析失败' };
+    const endpoint = 'https://' + t.host + '/';
+    const payload = JSON.stringify({ topic: t.topic, title: title, message: body, priority: 3, tags: ['memo'] });
+    // ① JSON 发布：ntfy 官方与自建服务器都返回 CORS 头，能读到真实回执
+    try {
+      const r = await fetch(endpoint, {
+        method: 'POST', mode: 'cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: payload
+      });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok && !j.error) return { ok: true, msg: 'ntfy 已接收（服务端已确认）', via: '①可校验' };
+      return { ok: false, msg: `ntfy 拒绝：${j.error || ('HTTP ' + r.status)}`, via: '①可校验' };
+    } catch (e1) { /* 降到图片探针 */ }
+    // ② 图片探针：走 GET 发布接口，不受跨域限制；正文过长会被截断
+    try {
+      const short = body.length > 300 ? body.slice(0, 300) + '…' : body;
+      await imgBeacon('https://' + t.host + '/' + encodeURIComponent(t.topic) + '/publish'
+        + '?title=' + encodeURIComponent(title) + '&message=' + encodeURIComponent(short));
+      return { ok: true, msg: '已用图片探针发出（是否送达请看手机）', via: '②图片探针' };
+    } catch (e2) { /* 继续降级 */ }
+    return { ok: false, msg: 'ntfy 没发出去（跨域被拦且探针失败）', via: '全部失败' };
+  }
+
   // 企微群机器人：无 CORS 头，只能 no-cors 盲发（fetch 抛错=请求根本没发出）
   const raw = JSON.stringify({ msgtype: 'text', text: { content: body } });
   try {
@@ -1076,7 +1319,7 @@ async function runDiag() {
     const isSafari = /Safari\//.test(navigator.userAgent) && !/Chrome|Chromium|Edg\//.test(navigator.userAgent);
     const ch = effChan();
     // 日志里出现的设备 Key 一律打码，避免整串明文留在屏幕上
-    const tk = barkTarget();
+    const tk = ch === 'bark' ? barkTarget() : null;
     let masked = (whCfg.url || '').replace(/([?&](key|device_key)=)[^&]+/gi, '$1***');
     if (tk && tk.deviceKey) masked = masked.split(tk.deviceKey).join(tk.deviceKey.slice(0, 6) + '***' + tk.deviceKey.slice(-4));
     pushLog(`自检 · 环境 ${location.protocol}// · ${ua}`, true);
@@ -1084,7 +1327,24 @@ async function runDiag() {
     if (isSafari && location.protocol === 'file:') {
       pushLog('自检 · ⚠ Safari 打开 file:// 页面：fetch 会被拦（回执读不到），推送会自动改用②隐藏表单发送；想看真实成功/失败回执，建议把本文件放到 https 访问（如 GitHub Pages）', false);
     }
-    if (ch !== 'bark') { pushLog('自检 · 企微通道仅支持盲发，无更多可诊断项', true); }
+    if (ch === 'wecom') { pushLog('自检 · 企微通道仅支持盲发，无更多可诊断项', true); }
+    else if (ch === 'ntfy') {
+      const t = ntfyTarget();
+      const ok = !!(t && t.topic);
+      pushLog(`自检 · 解析 host=${t ? t.host : '×'} · topic=${ok ? t.topic : '×'}`, ok);
+      if (ok) {
+        try {
+          const r = await fetch('https://' + t.host + '/', {
+            method: 'POST', mode: 'cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ topic: t.topic, title: '待办管理自检', message: '诊断消息 · ' + new Date().toTimeString().slice(0, 5) })
+          });
+          const j = await r.json().catch(() => ({}));
+          pushLog(`自检 · ntfy 发布：HTTP ${r.status} ${JSON.stringify(j)}`, r.ok && !j.error);
+        } catch (e) { pushLog('自检 · ntfy 发布被拦：' + ((e && e.message) || '跨域被拦'), false); }
+      }
+      pushLog('自检 · ntfy 判定：HTTP 200 即服务端已接收；手机需装 ntfy 并订阅同一个主题名（主题名即凭据，取复杂些）', true);
+    }
     else {
       const t = barkTarget();
       const keyOk = !!(t && t.deviceKey);
@@ -1862,6 +2122,9 @@ function download(name, content, type) {
 window.addEventListener('beforeunload', () => localStorage.setItem(KEY, JSON.stringify(D)));
 render();
 schedulePush();   // 精确定时：只在推送时刻醒来一次，不做空转轮询
+fillGhUI();
+if (ghReady()) { ghState('已配置 · 同步中…'); ghPull(true); }   // 开页即对齐云端
+else ghState('未配置');
 // 启动即自检运行环境：file:// 页面在多数浏览器里读不到推送回执（Safari 连发送都会拦），
 // 与其等到 17:20 才发现推不出去，不如一打开就说明清楚、并给出更省心的做法。
 (function envWarn() {
