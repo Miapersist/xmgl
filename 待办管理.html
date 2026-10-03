@@ -420,14 +420,15 @@
   <input type="file" id="fileInput" accept=".json" class="hide">
 </div>
 
-<details class="gh-panel" id="ghPanel">
+<details class="gh-panel" id="ghPanel" open>
   <summary>云同步（GitHub）<span class="cur-hint" id="ghState">未配置</span></summary>
+  <p class="gh-tip" style="margin-top:8px"><b>仓库已内置</b>：<code>Miapersist / xmgl</code>（main 分支，数据文件 <code>todo-data.json</code>）。你只需填一次下面的 Token，即可自动多端同步——打开页面自动拉取云端较新的一份，本地改动约 3 秒自动回推。其余四项已写死，无需修改。</p>
   <div class="gh-grid">
     <label>Token<input id="ghToken" type="password" autocomplete="off" spellcheck="false" placeholder="github_pat_… 或 ghp_…"></label>
-    <label>用户名<input id="ghOwner" spellcheck="false" placeholder="GitHub 用户名"></label>
-    <label>仓库<input id="ghRepo" spellcheck="false" placeholder="仓库名"></label>
-    <label>分支<input id="ghBranch" spellcheck="false" placeholder="main"></label>
-    <label>数据文件<input id="ghPath" spellcheck="false" placeholder="todo-data.json"></label>
+    <label>用户名（内置）<input id="ghOwner" readonly value="Miapersist" spellcheck="false"></label>
+    <label>仓库（内置）<input id="ghRepo" readonly value="xmgl" spellcheck="false"></label>
+    <label>分支（内置）<input id="ghBranch" readonly value="main" spellcheck="false"></label>
+    <label>数据文件（内置）<input id="ghPath" readonly value="todo-data.json" spellcheck="false"></label>
   </div>
   <div class="gh-acts">
     <button class="btn primary" id="ghSave">保存配置</button>
@@ -455,10 +456,8 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':
    注意：Token 只存在本机 localStorage，不写进仓库；同一时刻多端编辑以最后推送方为准。 */
 const GH_KEY = 'gpm-todo-gh';
 function defaultGh() {
-  // 从地址推断用户名与仓库，省一次手填：https://<user>.github.io/<repo>/xxx.html
-  const m = /^([^.]+)\.github\.io$/i.exec(location.hostname || '');
-  const seg = (location.pathname.split('/').filter(Boolean)[0] || '').replace(/\.[a-z]+$/i, '');
-  return { owner: m ? m[1] : '', repo: seg || '', branch: 'main', path: 'todo-data.json', token: '', sha: '', lastSync: 0 };
+  // 仓库信息已内置写死（公开信息，无泄漏风险）；只有 Token 需用户在浏览器里填一次、存本机
+  return { owner: 'Miapersist', repo: 'xmgl', branch: 'main', path: 'todo-data.json', token: '', sha: '', lastSync: 0 };
 }
 function loadGh() {
   try { return Object.assign(defaultGh(), JSON.parse(localStorage.getItem(GH_KEY)) || {}); }
@@ -594,8 +593,11 @@ function fillGhUI() {
 }
 $('#ghSave').addEventListener('click', () => {
   readGhFromUI();
-  toast(ghReady() ? '云同步配置已保存' : '还缺：Token / 用户名 / 仓库 / 数据文件');
-  ghState(ghReady() ? '已配置' : '未配置');
+  if (!ghReady()) { toast('还缺：Token（仓库已内置，无需填其余）'); ghState('未配置'); return; }
+  toast('云同步配置已保存');
+  ghState('已配置 · 同步中…');
+  // 首次填 Token 即开箱对齐：云端有数据就拉取覆盖，云端还没文件就立刻创建
+  ghPull(true).then(ok => { if (!ok && !gh.sha) ghPush(true); });
 });
 $('#ghTest').addEventListener('click', ghTest);
 $('#ghPullBtn').addEventListener('click', () => ghPull(false));
@@ -1109,7 +1111,7 @@ function renderDaily() {
     <input class="issue-input" placeholder="今天要上报的课题 / 协调事项，留空 = 暂无…" value="${esc(issue)}">
   </div>
   <div class="day-foot">
-    <span class="cur-hint">日报推送<sup style="opacity:.45;font-size:10px" title="代码版本，用于确认浏览器已加载最新文件">v11</sup></span>
+    <span class="cur-hint">日报推送<sup style="opacity:.45;font-size:10px" title="代码版本，用于确认浏览器已加载最新文件">v12</sup></span>
     <select class="wh-chan" title="推送通道（粘贴 Bark / ntfy 地址会自动切换）">
       <option value="wecom"${effChan() === 'wecom' ? ' selected' : ''}>企微机器人</option>
       <option value="bark"${effChan() === 'bark' ? ' selected' : ''}>Bark 手机推送（仅 iOS）</option>
